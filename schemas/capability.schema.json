@@ -1,0 +1,1483 @@
+{
+  "$defs": {
+    "AppRef": {
+      "additionalProperties": false,
+      "description": "Which application (and versions) the capability was recorded against, and through which\napp profile (login, interstitials, shared outcomes) and surface it is replayed.",
+      "properties": {
+        "product": {
+          "default": "meridian-core",
+          "title": "Product",
+          "type": "string"
+        },
+        "product_versions": {
+          "default": ">=4.2,<5",
+          "title": "Product Versions",
+          "type": "string"
+        },
+        "profile": {
+          "default": "meridian-core",
+          "title": "Profile",
+          "type": "string"
+        },
+        "surface": {
+          "const": "web",
+          "default": "web",
+          "title": "Surface",
+          "type": "string"
+        }
+      },
+      "title": "AppRef",
+      "type": "object"
+    },
+    "BBox": {
+      "properties": {
+        "height": {
+          "title": "Height",
+          "type": "number"
+        },
+        "width": {
+          "title": "Width",
+          "type": "number"
+        },
+        "x": {
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "title": "Y",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "BBox",
+      "type": "object"
+    },
+    "Checkpoint": {
+      "additionalProperties": false,
+      "description": "A condition set that must become true within `timeout_ms`.\n\nEvery `all_of` condition must hold, and when `any_of` is given at least one of it must hold\ntoo. The replay engine polls until the checkpoint holds or the timeout elapses, then reports\nwhich conditions failed (expected vs observed).",
+      "properties": {
+        "all_of": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "target_absent": "#/$defs/TargetAbsent",
+                "target_present": "#/$defs/TargetPresent",
+                "text_absent": "#/$defs/TextAbsent",
+                "text_present": "#/$defs/TextPresent",
+                "title_contains": "#/$defs/TitleContains",
+                "url_matches": "#/$defs/UrlMatches"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/UrlMatches"
+              },
+              {
+                "$ref": "#/$defs/TextPresent"
+              },
+              {
+                "$ref": "#/$defs/TextAbsent"
+              },
+              {
+                "$ref": "#/$defs/TargetPresent"
+              },
+              {
+                "$ref": "#/$defs/TargetAbsent"
+              },
+              {
+                "$ref": "#/$defs/TitleContains"
+              }
+            ]
+          },
+          "title": "All Of",
+          "type": "array"
+        },
+        "any_of": {
+          "anyOf": [
+            {
+              "items": {
+                "discriminator": {
+                  "mapping": {
+                    "target_absent": "#/$defs/TargetAbsent",
+                    "target_present": "#/$defs/TargetPresent",
+                    "text_absent": "#/$defs/TextAbsent",
+                    "text_present": "#/$defs/TextPresent",
+                    "title_contains": "#/$defs/TitleContains",
+                    "url_matches": "#/$defs/UrlMatches"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/UrlMatches"
+                  },
+                  {
+                    "$ref": "#/$defs/TextPresent"
+                  },
+                  {
+                    "$ref": "#/$defs/TextAbsent"
+                  },
+                  {
+                    "$ref": "#/$defs/TargetPresent"
+                  },
+                  {
+                    "$ref": "#/$defs/TargetAbsent"
+                  },
+                  {
+                    "$ref": "#/$defs/TitleContains"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Any Of"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "timeout_ms": {
+          "default": 5000,
+          "maximum": 120000,
+          "minimum": 0,
+          "title": "Timeout Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "description"
+      ],
+      "title": "Checkpoint",
+      "type": "object"
+    },
+    "Click": {
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/TargetSpec"
+        },
+        "type": {
+          "const": "click",
+          "default": "click",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "title": "Click",
+      "type": "object"
+    },
+    "CssPath": {
+      "description": "Structural nth-of-type path. Last resort: brittle by construction.",
+      "properties": {
+        "brittle": {
+          "const": true,
+          "default": true,
+          "title": "Brittle",
+          "type": "boolean"
+        },
+        "kind": {
+          "const": "css_path",
+          "default": "css_path",
+          "title": "Kind",
+          "type": "string"
+        },
+        "selector": {
+          "title": "Selector",
+          "type": "string"
+        }
+      },
+      "required": [
+        "selector"
+      ],
+      "title": "CssPath",
+      "type": "object"
+    },
+    "Extract": {
+      "additionalProperties": false,
+      "description": "Read the target's text into the declared output `output` (normalized per OutputField).",
+      "properties": {
+        "output": {
+          "title": "Output",
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/$defs/TargetSpec"
+        },
+        "type": {
+          "const": "extract",
+          "default": "extract",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "output"
+      ],
+      "title": "Extract",
+      "type": "object"
+    },
+    "Fill": {
+      "additionalProperties": false,
+      "description": "Type a value. Credentials must be `{{secret:NAME}}`; caller data `{{inputs.x}}`.",
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/TargetSpec"
+        },
+        "type": {
+          "const": "fill",
+          "default": "fill",
+          "title": "Type",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "value"
+      ],
+      "title": "Fill",
+      "type": "object"
+    },
+    "Fingerprint": {
+      "description": "What the element looked like at record time. Diagnostics only; never used for matching.",
+      "properties": {
+        "bbox": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BBox"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "tag": {
+          "title": "Tag",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "name",
+        "tag"
+      ],
+      "title": "Fingerprint",
+      "type": "object"
+    },
+    "FrameRef": {
+      "description": "A frame addressed by the chain of frame `name` attributes from the top document.",
+      "properties": {
+        "name_path": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Name Path",
+          "type": "array"
+        },
+        "url_path_pattern": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url Path Pattern"
+        }
+      },
+      "title": "FrameRef",
+      "type": "object"
+    },
+    "InputParam": {
+      "additionalProperties": false,
+      "description": "One declared input. Steps reference it as `{{inputs.<name>}}`.\n\n`sensitive` inputs are never logged and get no `example`. In a tool definition they are\nmarked writeOnly.",
+      "properties": {
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "enum_values": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Enum Values"
+        },
+        "example": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Example"
+        },
+        "max": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max"
+        },
+        "min": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min"
+        },
+        "name": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "pattern": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pattern"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "sensitive": {
+          "default": false,
+          "title": "Sensitive",
+          "type": "boolean"
+        },
+        "type": {
+          "enum": [
+            "string",
+            "integer",
+            "decimal",
+            "enum",
+            "date"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "description"
+      ],
+      "title": "InputParam",
+      "type": "object"
+    },
+    "LabelAnchor": {
+      "description": "The control of `role` in the same table row as a cell whose text equals `label`.",
+      "properties": {
+        "kind": {
+          "const": "label_anchor",
+          "default": "label_anchor",
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "link",
+            "button",
+            "textbox",
+            "combobox",
+            "checkbox",
+            "radio",
+            "cell",
+            "text"
+          ],
+          "title": "Role",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "role"
+      ],
+      "title": "LabelAnchor",
+      "type": "object"
+    },
+    "Navigate": {
+      "additionalProperties": false,
+      "description": "Load a path on the app's origin (relative only, never a full URL; policy re-checks it).",
+      "properties": {
+        "type": {
+          "const": "navigate",
+          "default": "navigate",
+          "title": "Type",
+          "type": "string"
+        },
+        "url_path": {
+          "title": "Url Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url_path"
+      ],
+      "title": "Navigate",
+      "type": "object"
+    },
+    "OutcomeSpec": {
+      "additionalProperties": false,
+      "description": "A legitimate business result that ends the run early. It is not an error.\n\nAfter each step listed in `check_after_steps` (\"*\" = after every step), replay evaluates\n`detect` before the step's own `expect`. On a match the run ends with\n{outcome: code, message: rendered message_template}. Outcomes let a calling agent branch on\ntyped results such as MEMBER_NOT_FOUND instead of parsing error strings.",
+      "properties": {
+        "check_after_steps": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "const": "*",
+              "type": "string"
+            }
+          ],
+          "default": "*",
+          "title": "Check After Steps"
+        },
+        "code": {
+          "pattern": "^[A-Z][A-Z0-9_]*$",
+          "title": "Code",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "detect": {
+          "$ref": "#/$defs/Checkpoint"
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "business",
+          "default": "business",
+          "title": "Kind",
+          "type": "string"
+        },
+        "message_template": {
+          "title": "Message Template",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "code",
+        "description",
+        "message_template",
+        "detect"
+      ],
+      "title": "OutcomeSpec",
+      "type": "object"
+    },
+    "OutputField": {
+      "additionalProperties": false,
+      "description": "One value the capability returns, produced by exactly one Extract step.\n\nThe raw text read from the UI first goes through `extract_pattern`, a regex with one\ncapture group that is optional, then through `normalize`. Money is returned as a decimal\nstring (\"12345.67\") so no precision is lost.",
+      "properties": {
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "extract_pattern": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Extract Pattern"
+        },
+        "name": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "normalize": {
+          "default": "none",
+          "enum": [
+            "none",
+            "money_to_decimal",
+            "strip",
+            "digits_only"
+          ],
+          "title": "Normalize",
+          "type": "string"
+        },
+        "nullable": {
+          "default": false,
+          "title": "Nullable",
+          "type": "boolean"
+        },
+        "sensitive": {
+          "default": false,
+          "title": "Sensitive",
+          "type": "boolean"
+        },
+        "type": {
+          "enum": [
+            "string",
+            "integer",
+            "decimal",
+            "money",
+            "date"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "description"
+      ],
+      "title": "OutputField",
+      "type": "object"
+    },
+    "Preconditions": {
+      "additionalProperties": false,
+      "description": "Where the run starts. With session=\"login_subflow\" replay first runs the profile's login\nsubflow (secrets resolved at fill time), then the capability steps.",
+      "properties": {
+        "entry_path": {
+          "default": "/login",
+          "title": "Entry Path",
+          "type": "string"
+        },
+        "session": {
+          "default": "login_subflow",
+          "enum": [
+            "login_subflow",
+            "none"
+          ],
+          "title": "Session",
+          "type": "string"
+        }
+      },
+      "title": "Preconditions",
+      "type": "object"
+    },
+    "Press": {
+      "additionalProperties": false,
+      "description": "Press a key (Playwright key name, e.g. \"Enter\", \"Tab\", \"Control+A\").\n\nWith no target, the key goes to whatever has focus. Enter and Space are risk-classified at\nruntime by what they would trigger (see GuardedSurface.press).",
+      "properties": {
+        "key": {
+          "pattern": "^(?:(?:Control|Shift|Alt|Meta)\\+)*(?:[A-Za-z0-9]|[A-Z][A-Za-z0-9]+| )$",
+          "title": "Key",
+          "type": "string"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TargetSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "type": {
+          "const": "press",
+          "default": "press",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "title": "Press",
+      "type": "object"
+    },
+    "Provenance": {
+      "additionalProperties": false,
+      "description": "Where this artifact came from. It stores hashes and pointers only: no transcript, no raw\ngoal text, no screenshots. Evidence lives in (redacted) run directories.",
+      "properties": {
+        "evidence_dir": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Dir"
+        },
+        "git_commit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Git Commit"
+        },
+        "goal_redacted": {
+          "title": "Goal Redacted",
+          "type": "string"
+        },
+        "model_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Id"
+        },
+        "recorded_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recorded At"
+        },
+        "recorded_from_run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recorded From Run Id"
+        },
+        "recorder_version": {
+          "title": "Recorder Version",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "discovery",
+            "hand_written"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "transcript_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Transcript Sha256"
+        }
+      },
+      "required": [
+        "source",
+        "goal_redacted",
+        "recorder_version"
+      ],
+      "title": "Provenance",
+      "type": "object"
+    },
+    "RetryPolicy": {
+      "additionalProperties": false,
+      "description": "Bounded, deterministic retry of one step: fixed backoff, only for the listed failures.",
+      "properties": {
+        "backoff_ms": {
+          "default": 500,
+          "maximum": 30000,
+          "minimum": 0,
+          "title": "Backoff Ms",
+          "type": "integer"
+        },
+        "max_attempts": {
+          "default": 1,
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Max Attempts",
+          "type": "integer"
+        },
+        "on": {
+          "items": {
+            "enum": [
+              "settle_timeout",
+              "target_not_found",
+              "navigation_failed"
+            ],
+            "type": "string"
+          },
+          "title": "On",
+          "type": "array"
+        }
+      },
+      "title": "RetryPolicy",
+      "type": "object"
+    },
+    "Review": {
+      "additionalProperties": false,
+      "description": "Human approval record. Not part of the content hash.",
+      "properties": {
+        "approved_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approved At"
+        },
+        "approved_content_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approved Content Hash"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        },
+        "reviewed_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reviewed By"
+        }
+      },
+      "title": "Review",
+      "type": "object"
+    },
+    "RoleName": {
+      "properties": {
+        "exact": {
+          "default": true,
+          "title": "Exact",
+          "type": "boolean"
+        },
+        "kind": {
+          "const": "role_name",
+          "default": "role_name",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "link",
+            "button",
+            "textbox",
+            "combobox",
+            "checkbox",
+            "radio",
+            "cell",
+            "text"
+          ],
+          "title": "Role",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "name"
+      ],
+      "title": "RoleName",
+      "type": "object"
+    },
+    "SecretRef": {
+      "additionalProperties": false,
+      "description": "A secret the capability needs, by environment name only. The value is never stored.",
+      "properties": {
+        "name": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "purpose": {
+          "title": "Purpose",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "purpose"
+      ],
+      "title": "SecretRef",
+      "type": "object"
+    },
+    "Select": {
+      "additionalProperties": false,
+      "description": "Choose a <select> option by its visible label.",
+      "properties": {
+        "option": {
+          "title": "Option",
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/$defs/TargetSpec"
+        },
+        "type": {
+          "const": "select",
+          "default": "select",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "option"
+      ],
+      "title": "Select",
+      "type": "object"
+    },
+    "Step": {
+      "additionalProperties": false,
+      "description": "One replayable action plus why it is there, how risky it is and how to verify it.\n\n`id` is stable across versions, so tenant overrides and approvals refer to it. `risk` is what\nthe policy said at record time, and GuardedSurface re-checks it live at replay time. When the\ntwo disagree, the stricter one wins. An irreversible step must have\n`requires_approval=True`. `approved` is set only by `cua artifact approve`, and it is\nexcluded from the content hash.",
+      "properties": {
+        "action": {
+          "discriminator": {
+            "mapping": {
+              "click": "#/$defs/Click",
+              "extract": "#/$defs/Extract",
+              "fill": "#/$defs/Fill",
+              "navigate": "#/$defs/Navigate",
+              "press": "#/$defs/Press",
+              "select": "#/$defs/Select"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Navigate"
+            },
+            {
+              "$ref": "#/$defs/Click"
+            },
+            {
+              "$ref": "#/$defs/Fill"
+            },
+            {
+              "$ref": "#/$defs/Select"
+            },
+            {
+              "$ref": "#/$defs/Press"
+            },
+            {
+              "$ref": "#/$defs/Extract"
+            }
+          ],
+          "title": "Action"
+        },
+        "approved": {
+          "default": false,
+          "title": "Approved",
+          "type": "boolean"
+        },
+        "expect": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Checkpoint"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "intent": {
+          "title": "Intent",
+          "type": "string"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        },
+        "requires_approval": {
+          "default": false,
+          "title": "Requires Approval",
+          "type": "boolean"
+        },
+        "retry": {
+          "$ref": "#/$defs/RetryPolicy"
+        },
+        "risk": {
+          "enum": [
+            "safe",
+            "risky",
+            "irreversible"
+          ],
+          "title": "Risk",
+          "type": "string"
+        },
+        "settle_timeout_ms": {
+          "default": 15000,
+          "maximum": 120000,
+          "minimum": 0,
+          "title": "Settle Timeout Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "intent",
+        "action",
+        "risk"
+      ],
+      "title": "Step",
+      "type": "object"
+    },
+    "TableCell": {
+      "description": "The cell in column `column_header` of the row containing a cell equal to `row_key`.\n\n`row_key` is the only locator field that may be parameterized. Its whole value may be\n`{{inputs.<name>}}`, e.g. \"the NAME cell of the result row for the member searched\". It is a\nstructural position keyed by a declared, non-sensitive input, so no PII ever lives in the\nartifact. Artifact lint enforces that. The template is bound with TargetSpec.bind() before\nresolving. Matching an unbound template is a programming error.",
+      "properties": {
+        "column_header": {
+          "title": "Column Header",
+          "type": "string"
+        },
+        "kind": {
+          "const": "table_cell",
+          "default": "table_cell",
+          "title": "Kind",
+          "type": "string"
+        },
+        "row_key": {
+          "title": "Row Key",
+          "type": "string"
+        },
+        "section_header": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Section Header"
+        }
+      },
+      "required": [
+        "row_key",
+        "column_header"
+      ],
+      "title": "TableCell",
+      "type": "object"
+    },
+    "TargetAbsent": {
+      "additionalProperties": false,
+      "description": "The target resolves to no element.",
+      "properties": {
+        "kind": {
+          "const": "target_absent",
+          "default": "target_absent",
+          "title": "Kind",
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/$defs/TargetSpec"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "title": "TargetAbsent",
+      "type": "object"
+    },
+    "TargetPresent": {
+      "additionalProperties": false,
+      "description": "The target resolves to exactly one element (any strategy).",
+      "properties": {
+        "kind": {
+          "const": "target_present",
+          "default": "target_present",
+          "title": "Kind",
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/$defs/TargetSpec"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "title": "TargetPresent",
+      "type": "object"
+    },
+    "TargetSpec": {
+      "properties": {
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "fingerprint": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Fingerprint"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "frame": {
+          "$ref": "#/$defs/FrameRef"
+        },
+        "strategies": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "css_path": "#/$defs/CssPath",
+                "label_anchor": "#/$defs/LabelAnchor",
+                "role_name": "#/$defs/RoleName",
+                "table_cell": "#/$defs/TableCell",
+                "text_match": "#/$defs/TextMatch"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/RoleName"
+              },
+              {
+                "$ref": "#/$defs/LabelAnchor"
+              },
+              {
+                "$ref": "#/$defs/TableCell"
+              },
+              {
+                "$ref": "#/$defs/TextMatch"
+              },
+              {
+                "$ref": "#/$defs/CssPath"
+              }
+            ]
+          },
+          "title": "Strategies",
+          "type": "array"
+        }
+      },
+      "required": [
+        "frame",
+        "strategies",
+        "description"
+      ],
+      "title": "TargetSpec",
+      "type": "object"
+    },
+    "TextAbsent": {
+      "additionalProperties": false,
+      "description": "Visible text of the frame (any frame if None) does not contain `text`.",
+      "properties": {
+        "frame": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FrameRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "kind": {
+          "const": "text_absent",
+          "default": "text_absent",
+          "title": "Kind",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "TextAbsent",
+      "type": "object"
+    },
+    "TextMatch": {
+      "properties": {
+        "exact": {
+          "default": true,
+          "title": "Exact",
+          "type": "boolean"
+        },
+        "kind": {
+          "const": "text_match",
+          "default": "text_match",
+          "title": "Kind",
+          "type": "string"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "enum": [
+                "link",
+                "button",
+                "textbox",
+                "combobox",
+                "checkbox",
+                "radio",
+                "cell",
+                "text"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Role"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "TextMatch",
+      "type": "object"
+    },
+    "TextPresent": {
+      "additionalProperties": false,
+      "description": "Visible text of the frame (any frame if None) contains `text`.\n\nThe default is a case-sensitive substring match on whitespace-normalized text. With\nexact=True the frame's whole text must equal `text`. `text` may use `{{inputs.x}}`, but it\nmust never contain sensitive values, and lint runs the Redactor over it.",
+      "properties": {
+        "exact": {
+          "default": false,
+          "title": "Exact",
+          "type": "boolean"
+        },
+        "frame": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FrameRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "kind": {
+          "const": "text_present",
+          "default": "text_present",
+          "title": "Kind",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "TextPresent",
+      "type": "object"
+    },
+    "TitleContains": {
+      "additionalProperties": false,
+      "description": "The frame's document title contains `text`.",
+      "properties": {
+        "frame": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FrameRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "kind": {
+          "const": "title_contains",
+          "default": "title_contains",
+          "title": "Kind",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "TitleContains",
+      "type": "object"
+    },
+    "UrlMatches": {
+      "additionalProperties": false,
+      "description": "The frame's URL path (query ignored) matches an fnmatch glob, e.g. \"/member/detail*\".",
+      "properties": {
+        "frame": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FrameRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "kind": {
+          "const": "url_matches",
+          "default": "url_matches",
+          "title": "Kind",
+          "type": "string"
+        },
+        "path_glob": {
+          "title": "Path Glob",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path_glob"
+      ],
+      "title": "UrlMatches",
+      "type": "object"
+    }
+  },
+  "$id": "https://cua.local/schemas/capability.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Root of a capability artifact (`capabilities/<id>/<version>.json`).\n\n`schema_version` is the version of this file format. `version` is the semver of this\ncapability, with these rules:\n- MAJOR: the input/output contract changed (inputs, outputs, types, outcome codes). Calling\n  agents pin MAJOR.\n- MINOR: steps or outcomes changed but the contract is the same (e.g. a new navigation path).\n- PATCH: locator, timeout or retry tweaks only, such as a strategy added after UI drift.\n\nThe model validator runs the full lint (cua.artifact.lint) and reports every problem at\nonce. Pass `context={\"sensitive_labels\": [...]}` to model_validate to add the app profile's\nlabels; `store.load()` does that.",
+  "properties": {
+    "app": {
+      "$ref": "#/$defs/AppRef"
+    },
+    "description": {
+      "title": "Description",
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$",
+      "title": "Id",
+      "type": "string"
+    },
+    "inputs": {
+      "items": {
+        "$ref": "#/$defs/InputParam"
+      },
+      "title": "Inputs",
+      "type": "array"
+    },
+    "outcomes": {
+      "items": {
+        "$ref": "#/$defs/OutcomeSpec"
+      },
+      "title": "Outcomes",
+      "type": "array"
+    },
+    "outputs": {
+      "items": {
+        "$ref": "#/$defs/OutputField"
+      },
+      "title": "Outputs",
+      "type": "array"
+    },
+    "preconditions": {
+      "$ref": "#/$defs/Preconditions"
+    },
+    "provenance": {
+      "$ref": "#/$defs/Provenance"
+    },
+    "review": {
+      "$ref": "#/$defs/Review"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "secrets": {
+      "items": {
+        "$ref": "#/$defs/SecretRef"
+      },
+      "title": "Secrets",
+      "type": "array"
+    },
+    "status": {
+      "default": "draft",
+      "enum": [
+        "draft",
+        "approved",
+        "deprecated"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/Step"
+      },
+      "minItems": 1,
+      "title": "Steps",
+      "type": "array"
+    },
+    "success": {
+      "$ref": "#/$defs/Checkpoint"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "use_profile_outcomes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Use Profile Outcomes",
+      "type": "array"
+    },
+    "version": {
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z.-]+)?$",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "version",
+    "title",
+    "description",
+    "steps",
+    "success",
+    "provenance"
+  ],
+  "title": "Capability",
+  "type": "object"
+}

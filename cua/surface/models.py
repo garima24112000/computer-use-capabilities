@@ -59,9 +59,23 @@ class ScannedElement(ElementInfo):
     handle: str  # value of the transient data-cua-tmp attribute
     css_path: str
     row_texts: list[str] = Field(default_factory=list)
+    form_key: str | None = None  # form name (or "form#i") the control belongs to / submits
+    submits_form: bool = False  # native submit control or calls <form>.submit()
+    focused: bool = False  # document.activeElement of its frame
 
     def public(self) -> ElementInfo:
         return ElementInfo.model_validate(self.model_dump(include=set(ElementInfo.model_fields)))
+
+
+class KeyContext(BaseModel):
+    """What pressing a key would act on. Used to classify the risk of Enter."""
+
+    known: bool  # False if the surface could not tell (treat as risky)
+    focused: ElementInfo | None = None  # element receiving the key
+    # What Enter would trigger: the focused control itself if it is a button/link, else every
+    # control that submits the focused element's form. Empty = no known submit control.
+    submit_controls: list[ElementInfo] = Field(default_factory=list)
+    note: str = ""
 
 
 class FrameInfo(BaseModel):

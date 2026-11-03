@@ -36,6 +36,18 @@ against.
   data-handling guarantee: keep it green.
 - Playwright traces (`runs/<id>/trace.zip`) are opt-in and contain UNMASKED DOM. Never commit them.
 
+## Artifacts (built)
+
+- Schema: `cua/artifact/` (`schema.py` re-exports conditions/contract/steps/lint). Lint runs in the
+  model validator and reports every problem; `store.load()` adds the profile's sensitive labels.
+- Templates: only `{{inputs.x}}` and whole-value `{{secret:NAME}}` (`cua/templating.py`). The only
+  parameterized locator field is `TableCell.row_key` (bind with `TargetSpec.bind(inputs)`).
+- `content_hash()` excludes status/review/provenance/step `approved`; `cua artifact approve`
+  records it, and `is_approved()` is false after any functional edit. A saved version can only
+  be overwritten with the same content hash, so bump `version` for any functional change.
+- `sensitive_labels` live in the app profile only; `configs/policy.yaml` references them.
+- `tests/fixtures/capabilities/` are hand-written fixtures, not discovery output.
+
 ## Conventions
 
 - Python 3.11, managed with `uv`. Use the Playwright **sync** API everywhere.

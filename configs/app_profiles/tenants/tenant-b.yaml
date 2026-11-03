@@ -1,0 +1,58 @@
+# Tenant override for Prairie Harvest FCU (target_app --tenant b), validated by
+# cua.artifact.overrides.TenantOverride. Only presentation differs. The contract, risk and
+# approvals stay with the base artifacts.
+#
+# Differences from tenant A, and how each is handled:
+#   member field label  MEMBER NO.    -> ACCT HOLDER #   patched below (prepend: A's stays as fallback)
+#   inquiry button      INQUIRE       -> SEARCH          patched below (replace)
+#   nav menu order      inquiry/open  -> open/inquiry    no patch: locators are by name, not position
+#   ACCOUNTS table      + RATE column                    no patch: TableCell keys on header text
+#   bank name / colours                                  no patch: nothing keys on them
+#   results table header MEMBER NO.   -> ACCT HOLDER #   no patch: s03/s04 key on the NAME column
+tenant: b
+reason: >-
+  Prairie Harvest FCU's deployment relabels the member-number field and the inquiry button.
+applies_to:
+  - {capability: meridian.member.read_savings_balance, versions: "1.x"}
+  - {capability: meridian.subaccount.open, versions: "1.x"}
+  - {profile: meridian-core}
+patches:
+  - capability: meridian.member.read_savings_balance
+    at: s02_fill_member_no
+    op: prepend_strategy
+    path: action.target
+    value: {kind: label_anchor, label: "ACCT HOLDER #", role: textbox}
+  - capability: meridian.member.read_savings_balance
+    at: s02_fill_member_no
+    op: set_field
+    path: action.target.description
+    value: "ACCT HOLDER # field"
+  - capability: meridian.member.read_savings_balance
+    at: s03_click_inquire
+    op: replace_strategy
+    path: action.target
+    index: 0
+    value: {kind: role_name, role: link, name: SEARCH}
+  - capability: meridian.member.read_savings_balance
+    at: s03_click_inquire
+    op: replace_strategy
+    path: action.target
+    index: 1
+    value: {kind: text_match, text: SEARCH, role: link}
+  - capability: meridian.member.read_savings_balance
+    at: s03_click_inquire
+    op: replace_text
+    path: action.target.description
+    old: INQUIRE
+    value: SEARCH
+  - capability: meridian.subaccount.open
+    at: s02_fill_member_no
+    op: prepend_strategy
+    path: action.target
+    value: {kind: label_anchor, label: "ACCT HOLDER #", role: textbox}
+  # The profile's not-found detector already matches tenant B ("NO RECORDS FOUND FOR MEMBER NO."
+  # is not relabelled). This patch only makes the outcome message read in tenant B's terms.
+  - at: "profile:outcomes[id=member_not_found].message_template"
+    op: replace_text
+    old: member number
+    value: account holder number

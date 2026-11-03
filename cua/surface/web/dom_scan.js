@@ -190,6 +190,30 @@
     return false;
   }
 
+  // ---- forms & focus (risk of pressing Enter) ---------------------------------------------------
+  // A control "submits" a form if it is a native submit control or its onclick/javascript: href
+  // calls `<form>.submit()`. Legacy pages often reference the form by name (document.frmQ.submit()),
+  // so a named reference wins over DOM ancestry.
+  const SUBMIT_CALL = /(?:document\.)?([A-Za-z_$][\w$]*)?\.submit\s*\(/;
+  const formKey = (f) => (f ? f.getAttribute('name') || 'form#' + Array.from(document.forms).indexOf(f) : null);
+  function scriptOf(el) {
+    const href = el.tagName === 'A' ? el.getAttribute('href') || '' : '';
+    return (el.getAttribute('onclick') || '') + ' ' + (/^javascript:/i.test(href) ? href : '');
+  }
+  function submitInfo(el) {
+    const t = inputType(el);
+    if (el.tagName === 'INPUT' && (t === 'submit' || t === 'image')) return [formKey(el.form), true];
+    if (el.tagName === 'BUTTON' && (el.getAttribute('type') || 'submit').toLowerCase() === 'submit') {
+      return [formKey(el.form), true];
+    }
+    const m = SUBMIT_CALL.exec(scriptOf(el));
+    if (m) {
+      const named = m[1] && document.forms[m[1]];
+      return [named ? formKey(named) : formKey(el.closest('form')), true];
+    }
+    return [formKey(el.form || el.closest('form')), false];
+  }
+
   // ---- scan ------------------------------------------------------------------------------------
   const out = [];
   let seq = opts.start || 0;
@@ -215,6 +239,7 @@
       el.setAttribute('data-cua-ref', ref);
     }
     const label = interactive ? precedingCellText(el) || explicitLabel(el) || null : null;
+    const [form, submits] = interactive ? submitInfo(el) : [null, false];
     out.push({
       ref,
       handle: handleOf(el),
@@ -232,6 +257,9 @@
       table_context: ctx,
       css_path: cssPath(el),
       row_texts: rowTexts,
+      form_key: form,
+      submits_form: submits,
+      focused: el === document.activeElement,
     });
   }
   const root = document.body || document.documentElement;
@@ -239,6 +267,7 @@
     elements: out,
     next: seq,
     title: document.title || '',
+    has_focus: document.hasFocus(),
     text: norm(root ? root.innerText : '').slice(0, opts.maxFrameText),
   };
 }

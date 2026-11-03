@@ -16,7 +16,14 @@ from pathlib import Path
 from typing import Literal
 
 from cua.surface.locators import TargetSpec
-from cua.surface.models import ActionResult, ElementHandleRef, FrameRef, Observation, ResolveResult
+from cua.surface.models import (
+    ActionResult,
+    ElementHandleRef,
+    FrameRef,
+    KeyContext,
+    Observation,
+    ResolveResult,
+)
 
 Target = str | TargetSpec
 DialogDecision = Literal["accept", "dismiss"]
@@ -60,6 +67,11 @@ class Surface(ABC):
     @abstractmethod
     def press(self, key: str, target: Target | None = None, *, settle: bool = True
               ) -> ActionResult: ...
+
+    def key_context(self, target: Target | None = None) -> KeyContext:
+        """The element a key press would reach (target, or the focused element) and the submit
+        control of its form. Surfaces that cannot tell return known=False."""
+        return KeyContext(known=False, note=f"{type(self).__name__} has no key_context")
 
     @abstractmethod
     def read_text(self, target: Target) -> str: ...

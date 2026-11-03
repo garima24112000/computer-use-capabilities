@@ -34,6 +34,7 @@ from cua.surface.models import (
     ElementHandleRef,
     FrameInfo,
     FrameRef,
+    KeyContext,
     Observation,
     ResolveResult,
     ScannedElement,
@@ -520,6 +521,53 @@ class PlaywrightSurface(Surface):
                 loc.press(key)
 
         return self._act("press", target, do, settle)
+
+    def key_context(self, target: Target | None = None) -> KeyContext:
+        try:
+            found = self._key_target(target)
+        except (PlaywrightError, TargetNotFound) as exc:
+            return KeyContext(known=False, note=_first_line(exc))
+        if isinstance(found, str):
+            return KeyContext(known=False, note=found)
+        scanned, el = found
+        if el.submits_form or el.role in ("button", "link"):
+            controls = [el]  # Enter activates the focused control itself
+        elif el.form_key is not None:
+            controls = [e for e in scanned if e.submits_form and e.form_key == el.form_key]
+        else:
+            controls = []
+        return KeyContext(known=True, focused=el.public(),
+                          submit_controls=[c.public() for c in controls])
+
+    def _key_target(self, target: Target | None
+                    ) -> tuple[list[ScannedElement], ScannedElement] | str:
+        """(frame scan, element) a key press reaches, or a reason string if unknown."""
+        if target is None:
+            found: list[tuple[bool, list[ScannedElement], ScannedElement]] = []
+            for frame in self._frames():
+                try:
+                    scanned, raw = self._scan(frame, "resolve")
+                except PlaywrightError:
+                    continue
+                found += [(raw["has_focus"], scanned, e) for e in scanned if e.focused]
+            picks = [f for f in found if f[0]] or found
+            if len(picks) != 1:
+                return f"{len(picks)} focused element candidates"
+            return picks[0][1], picks[0][2]
+        if isinstance(target, str):
+            last = self._last.get(target)
+            if last is None:
+                return "unknown ref; call observe() first"
+            fref, handle = last.frame, last.handle
+        else:
+            ref, _ = self.resolve(target)
+            fref, handle = ref.frame, ref.selector.split('"')[1]
+        frame = self._frame_for(fref)
+        if frame is None:
+            return f"frame {fref.key} is gone"
+        scanned, _ = self._scan(frame, "resolve")
+        el = next((e for e in scanned if e.handle == handle), None)
+        return (scanned, el) if el is not None else "element is gone"
 
     # --- read -----------------------------------------------------------------------------------
 

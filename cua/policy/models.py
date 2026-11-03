@@ -61,10 +61,19 @@ class PolicyConfig(BaseModel):
     default_risk: dict[Action, Risk]
     mode_rules: dict[Mode, dict[Risk, VerdictRule]]
     sensitive_labels: list[str] = Field(default_factory=list)
+    # App profile YAML (relative to the policy file) whose `sensitive_labels` are merged in.
+    sensitive_labels_from: str | None = None
 
     @classmethod
     def load(cls, path: str | Path = DEFAULT_POLICY_PATH) -> "PolicyConfig":
-        return cls.model_validate(yaml.safe_load(Path(path).read_text()))
+        path = Path(path)
+        data = yaml.safe_load(path.read_text())
+        if ref := data.get("sensitive_labels_from"):
+            profile = yaml.safe_load((path.parent / ref).read_text()) or {}
+            merged = list(profile.get("sensitive_labels") or [])
+            merged += [lab for lab in data.get("sensitive_labels") or [] if lab not in merged]
+            data["sensitive_labels"] = merged
+        return cls.model_validate(data)
 
 
 class PolicyContext(BaseModel):

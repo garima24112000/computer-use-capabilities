@@ -1,0 +1,348 @@
+{
+  "app": {
+    "product": "meridian-core",
+    "product_versions": ">=4.2,<5",
+    "profile": "meridian-core",
+    "surface": "web"
+  },
+  "description": "Looks up a member by member number and returns the balance of the base Share Savings account (suffix 00). HAND-WRITTEN TEST FIXTURE: real artifacts come from discovery.",
+  "id": "meridian.member.read_savings_balance",
+  "inputs": [
+    {
+      "description": "5-digit member number",
+      "example": "12345",
+      "name": "member_id",
+      "pattern": "^\\d{5}$",
+      "required": true,
+      "sensitive": false,
+      "type": "string"
+    }
+  ],
+  "outcomes": [],
+  "outputs": [
+    {
+      "description": "Balance of the Share Savings account (suffix 00) as a decimal string, e.g. 12345.67",
+      "name": "savings_balance",
+      "normalize": "money_to_decimal",
+      "nullable": false,
+      "sensitive": false,
+      "type": "money"
+    }
+  ],
+  "preconditions": {
+    "entry_path": "/login",
+    "session": "login_subflow"
+  },
+  "provenance": {
+    "goal_redacted": "Read the share savings balance for a member",
+    "recorder_version": "hand-written",
+    "source": "hand_written"
+  },
+  "review": {},
+  "schema_version": "1.0",
+  "secrets": [],
+  "status": "draft",
+  "steps": [
+    {
+      "action": {
+        "target": {
+          "description": "MEMBER INQUIRY menu item",
+          "frame": {
+            "name_path": [
+              "nav"
+            ]
+          },
+          "strategies": [
+            {
+              "exact": true,
+              "kind": "role_name",
+              "name": "MEMBER INQUIRY",
+              "role": "button"
+            },
+            {
+              "exact": true,
+              "kind": "text_match",
+              "text": "MEMBER INQUIRY"
+            }
+          ]
+        },
+        "type": "click"
+      },
+      "approved": false,
+      "expect": {
+        "all_of": [
+          {
+            "frame": {
+              "name_path": [
+                "main"
+              ]
+            },
+            "kind": "url_matches",
+            "path_glob": "/inquiry*"
+          }
+        ],
+        "description": "inquiry screen loaded",
+        "timeout_ms": 5000
+      },
+      "id": "s01_open_member_inquiry",
+      "intent": "Open the member inquiry screen from the left menu.",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "risky",
+      "settle_timeout_ms": 15000
+    },
+    {
+      "action": {
+        "target": {
+          "description": "MEMBER NO. field",
+          "frame": {
+            "name_path": [
+              "main"
+            ]
+          },
+          "strategies": [
+            {
+              "kind": "label_anchor",
+              "label": "MEMBER NO.",
+              "role": "textbox"
+            },
+            {
+              "exact": true,
+              "kind": "role_name",
+              "name": "MEMBER NO.",
+              "role": "textbox"
+            }
+          ]
+        },
+        "type": "fill",
+        "value": "{{inputs.member_id}}"
+      },
+      "approved": false,
+      "id": "s02_fill_member_no",
+      "intent": "Type the member number into the MEMBER NO. field.",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "safe",
+      "settle_timeout_ms": 15000
+    },
+    {
+      "action": {
+        "target": {
+          "description": "INQUIRE button",
+          "frame": {
+            "name_path": [
+              "main"
+            ]
+          },
+          "strategies": [
+            {
+              "exact": true,
+              "kind": "role_name",
+              "name": "INQUIRE",
+              "role": "link"
+            },
+            {
+              "exact": true,
+              "kind": "text_match",
+              "role": "link",
+              "text": "INQUIRE"
+            }
+          ]
+        },
+        "type": "click"
+      },
+      "approved": false,
+      "expect": {
+        "all_of": [
+          {
+            "kind": "target_present",
+            "target": {
+              "description": "NAME link in the result row for the member",
+              "frame": {
+                "name_path": [
+                  "main"
+                ]
+              },
+              "strategies": [
+                {
+                  "column_header": "NAME",
+                  "kind": "table_cell",
+                  "row_key": "{{inputs.member_id}}"
+                }
+              ]
+            }
+          }
+        ],
+        "description": "result row for the member is listed",
+        "timeout_ms": 5000
+      },
+      "id": "s03_click_inquire",
+      "intent": "Run the inquiry; either the result row appears or the core answers with a business outcome.",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "risky",
+      "settle_timeout_ms": 15000
+    },
+    {
+      "action": {
+        "target": {
+          "description": "NAME link in the result row for the member",
+          "frame": {
+            "name_path": [
+              "main"
+            ]
+          },
+          "strategies": [
+            {
+              "column_header": "NAME",
+              "kind": "table_cell",
+              "row_key": "{{inputs.member_id}}"
+            }
+          ]
+        },
+        "type": "click"
+      },
+      "approved": false,
+      "expect": {
+        "all_of": [
+          {
+            "frame": {
+              "name_path": [
+                "main"
+              ]
+            },
+            "kind": "url_matches",
+            "path_glob": "/member/detail*"
+          },
+          {
+            "exact": false,
+            "frame": {
+              "name_path": [
+                "main"
+              ]
+            },
+            "kind": "text_present",
+            "text": "MEMBER DETAIL - {{inputs.member_id}}"
+          }
+        ],
+        "description": "member detail page for the member",
+        "timeout_ms": 5000
+      },
+      "id": "s04_open_member_detail",
+      "intent": "Open the member detail page via the name link in the result row keyed by the member number.",
+      "notes": "The row is keyed by the member number (a declared, non-sensitive input), never by the member's name, which is PII.",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "risky",
+      "settle_timeout_ms": 15000
+    },
+    {
+      "action": {
+        "output": "savings_balance",
+        "target": {
+          "description": "Share Savings BALANCE cell in ACCOUNTS",
+          "frame": {
+            "name_path": [
+              "main"
+            ]
+          },
+          "strategies": [
+            {
+              "column_header": "BALANCE",
+              "kind": "table_cell",
+              "row_key": "Share Savings",
+              "section_header": "ACCOUNTS"
+            },
+            {
+              "column_header": "BALANCE",
+              "kind": "table_cell",
+              "row_key": "00",
+              "section_header": "ACCOUNTS"
+            }
+          ]
+        },
+        "type": "extract"
+      },
+      "approved": false,
+      "id": "s05_extract_savings_balance",
+      "intent": "Read the BALANCE of the Share Savings row in the ACCOUNTS table.",
+      "notes": "Fallback keys on suffix 00: if a second Share Savings sub-account exists, the first strategy is ambiguous and resolution falls through to the base account (reported as degraded).",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "safe",
+      "settle_timeout_ms": 15000
+    }
+  ],
+  "success": {
+    "all_of": [
+      {
+        "frame": {
+          "name_path": [
+            "main"
+          ]
+        },
+        "kind": "url_matches",
+        "path_glob": "/member/detail*"
+      },
+      {
+        "exact": false,
+        "frame": {
+          "name_path": [
+            "main"
+          ]
+        },
+        "kind": "text_present",
+        "text": "MEMBER DETAIL - {{inputs.member_id}}"
+      },
+      {
+        "exact": false,
+        "frame": {
+          "name_path": [
+            "main"
+          ]
+        },
+        "kind": "text_present",
+        "text": "ACCOUNTS"
+      }
+    ],
+    "description": "member detail with an ACCOUNTS table is shown",
+    "timeout_ms": 5000
+  },
+  "title": "Read a member's share savings balance",
+  "use_profile_outcomes": [
+    "member_not_found",
+    "invalid_member_format",
+    "access_denied"
+  ],
+  "version": "1.0.0"
+}

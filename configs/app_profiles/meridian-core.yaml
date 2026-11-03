@@ -1,0 +1,206 @@
+# App profile for Meridian Core (target_app), validated by cua.artifact.profile.AppProfile.
+# Hand-written against the real pages and reviewed like code. It covers: how to sign on, what
+# can get in the way, what failure looks like, and which labels mark PII.
+#
+# Frames: {} is the top document (sign-on page); {name_path: [nav]} is the left menu;
+# {name_path: [main]} is the work area. Locators use semantic strategies only (no CSS paths).
+id: meridian-core
+product: meridian-core
+product_versions: ">=4.2,<5"
+surface: web
+description: >-
+  Meridian Core v4.x servicing console: a 2005-era frameset (top banner, nav menu, main work
+  area) with no ids, aria attributes or labels. The operator signs on once, then works in the
+  main frame.
+
+secrets:
+  - name: BANK_OPERATOR_USER
+    purpose: operator sign-on id
+  - name: BANK_OPERATOR_PASS
+    purpose: operator sign-on password
+
+login_subflow:
+  - id: l01_open_sign_on
+    intent: Load the operator sign-on page.
+    action: {type: navigate, url_path: /login}
+    risk: safe
+    expect:
+      description: sign-on form is shown
+      all_of:
+        - {kind: text_present, frame: {}, text: OPERATOR SIGN ON}
+  - id: l02_fill_operator_id
+    intent: Enter the operator id (secret, resolved at fill time).
+    action:
+      type: fill
+      target:
+        frame: {}
+        description: OPERATOR ID field
+        strategies:
+          - {kind: label_anchor, label: OPERATOR ID, role: textbox}
+          - {kind: role_name, role: textbox, name: OPERATOR ID}
+      value: "{{secret:BANK_OPERATOR_USER}}"
+    risk: safe
+  - id: l03_fill_password
+    intent: Enter the operator password (secret, resolved at fill time).
+    action:
+      type: fill
+      target:
+        frame: {}
+        description: PASSWORD field
+        strategies:
+          - {kind: label_anchor, label: PASSWORD, role: textbox}
+          - {kind: role_name, role: textbox, name: PASSWORD}
+      value: "{{secret:BANK_OPERATOR_PASS}}"
+    risk: safe
+  - id: l04_click_sign_on
+    intent: Submit the sign-on form; the console frameset loads.
+    action:
+      type: click
+      target:
+        frame: {}
+        description: SIGN ON button
+        strategies:
+          - {kind: role_name, role: button, name: SIGN ON}
+          - {kind: text_match, text: SIGN ON}
+    risk: risky
+    expect:
+      description: console menu is loaded
+      timeout_ms: 10000
+      all_of:
+        - kind: target_present
+          target:
+            frame: {name_path: [nav]}
+            description: MEMBER INQUIRY menu item
+            strategies:
+              - {kind: role_name, role: button, name: MEMBER INQUIRY}
+
+interstitials:
+  - id: maintenance_notice
+    description: >-
+      "SYSTEM NOTICE" page served instead of the requested main-frame page; [CONTINUE] loads
+      the original page.
+    detect:
+      description: maintenance notice in the main frame
+      timeout_ms: 0
+      all_of:
+        - {kind: text_present, frame: {name_path: [main]}, text: "SYSTEM NOTICE — Scheduled maintenance"}
+    recover:
+      - type: click
+        target:
+          frame: {name_path: [main]}
+          description: "[CONTINUE] link on the system notice"
+          strategies:
+            - {kind: role_name, role: link, name: "[CONTINUE]"}
+            - {kind: text_match, text: CONTINUE, role: link, exact: false}
+    max_per_run: 3
+
+known_dialogs:
+  - id: unposted_items
+    message_regex: "^Unposted items exist\\."
+    response: accept
+    description: >-
+      confirm() on member detail. Dismissing it bounces back to the inquiry page, so accept it
+      to stay on the requested member.
+
+session_expired:
+  detect:
+    description: session-expired page in any frame
+    timeout_ms: 0
+    all_of:
+      - {kind: text_present, text: SESSION EXPIRED — PLEASE SIGN ON AGAIN}
+  recover: login_subflow
+  max_per_run: 1
+
+error_signatures:
+  - id: system_error_coffee
+    description: Back-end fault page (HTTP 500); the transaction was rolled back.
+    detect:
+      description: system error banner in the main frame
+      timeout_ms: 0
+      all_of:
+        - {kind: text_present, frame: {name_path: [main]}, text: SYSTEM ERROR 0xC0FFEE}
+    category: app_error
+    hard: true
+  - id: invalid_operator_credentials
+    description: Sign-on rejected; the configured operator secrets are wrong.
+    detect:
+      description: sign-on error
+      timeout_ms: 0
+      all_of:
+        - {kind: text_present, frame: {}, text: INVALID OPERATOR CREDENTIALS}
+    category: permission
+    hard: true
+  - id: invalid_account_type
+    description: Open-sub-account form rejected the account type (UI out of sync with the artifact).
+    detect:
+      description: account-type error on the open form
+      timeout_ms: 0
+      all_of:
+        - {kind: text_present, frame: {name_path: [main]}, text: INVALID ACCOUNT TYPE}
+    category: unknown_state
+    hard: true
+
+# Shared business outcomes. Capabilities opt in by id via `use_profile_outcomes`. They are
+# legitimate results, not errors.
+outcomes:
+  - id: member_not_found
+    code: MEMBER_NOT_FOUND
+    description: No member exists with the given number.
+    message_template: No records found for the requested member number.
+    detect:
+      description: not-found notice in the main frame
+      timeout_ms: 0
+      all_of:
+        - {kind: text_present, frame: {name_path: [main]}, text: NO RECORDS FOUND FOR MEMBER NO.}
+  - id: invalid_member_format
+    code: INVALID_MEMBER_FORMAT
+    description: The core rejected the member number format.
+    message_template: The member number format was rejected by the core system.
+    detect:
+      description: format error in the main frame
+      timeout_ms: 0
+      all_of:
+        - {kind: text_present, frame: {name_path: [main]}, text: INVALID MEMBER NUMBER FORMAT}
+  - id: access_denied
+    code: ACCESS_DENIED
+    description: The operator lacks privilege for this member (restricted record, code 403-R).
+    message_template: Access denied for this member (code 403-R).
+    detect:
+      description: access-denied notice in the main frame
+      timeout_ms: 0
+      all_of:
+        - {kind: text_present, frame: {name_path: [main]}, text: ACCESS DENIED — INSUFFICIENT PRIVILEGE (CODE 403-R)}
+  - id: deposit_out_of_range
+    code: DEPOSIT_OUT_OF_RANGE
+    description: Initial deposit must be > 0 and <= 10,000.00.
+    message_template: The initial deposit is out of the allowed range.
+    detect:
+      description: deposit range error on the open form
+      timeout_ms: 0
+      all_of:
+        - {kind: text_present, frame: {name_path: [main]}, text: DEPOSIT AMOUNT OUT OF RANGE}
+  - id: invalid_deposit_amount
+    code: INVALID_DEPOSIT_AMOUNT
+    description: The core could not parse the initial deposit.
+    message_template: The initial deposit amount is not a valid number.
+    detect:
+      description: deposit parse error on the open form
+      timeout_ms: 0
+      all_of:
+        - {kind: text_present, frame: {name_path: [main]}, text: INVALID DEPOSIT AMOUNT}
+
+# Single source of truth for PII labels (configs/policy.yaml -> sensitive_labels_from).
+# Matched case-insensitively as whole words against row labels, column headers and field labels.
+sensitive_labels:
+  - SSN
+  - SOCIAL SECURITY
+  - ADDRESS
+  - PHONE
+  - EMAIL
+  - DOB
+  - DATE OF BIRTH
+  - ACCOUNT NUMBER
+  - PASSWORD
+  - OPERATOR PASSWORD
+  - MEMBER NAME
+  - NAME

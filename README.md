@@ -5,8 +5,8 @@ typed, versioned capability artifact, and that artifact is replayed deterministi
 in the loop. The project also includes human-in-the-loop handoff and safety guardrails. See
 [CLAUDE.md](CLAUDE.md) for the project rules.
 
-> Status: scaffold and target app only. The agent, replay engine and other parts come in later
-> steps.
+> Status: target app, surface layer, guardrails and the capability artifact schema are built. The
+> LLM discovery loop, replay engine and HITL console come in later steps.
 
 ## Install
 
@@ -47,6 +47,29 @@ uv run python scripts/observe.py       # print the Observation an LLM would see 
 uv run ruff check .
 ```
 
+## Capability artifacts
+
+A capability is a typed, versioned JSON artifact (`capabilities/<id>/<version>.json`). It holds the
+contract (inputs, outputs, business outcomes), the replayable steps with multi-strategy locators,
+the checkpoints, and the approval/provenance records. App-wide behaviour (login, interstitials,
+dialogs, error screens, shared outcomes, PII labels) lives in the app profile
+`configs/app_profiles/meridian-core.yaml`. Per-tenant UI differences live in overlays under
+`configs/app_profiles/tenants/`.
+
+```bash
+F=tests/fixtures/capabilities/meridian.member.read_savings_balance/1.0.0.json
+uv run cua artifact validate $F          # schema + lint (all problems at once)
+uv run cua artifact show $F              # human review rendering (markdown)
+uv run cua artifact tool $F              # what a calling agent sees (JSON Schema in/out)
+uv run cua artifact approve $F --reviewer NAME [--note ...]   # approve gated steps, record hash
+uv run cua artifact schema               # export schemas/*.schema.json
+uv run cua profile validate configs/app_profiles/meridian-core.yaml
+```
+
+> **The two artifacts under `tests/fixtures/capabilities/` are HAND-WRITTEN TEST FIXTURES**
+> (`meridian.member.read_savings_balance`, `meridian.subaccount.open`). They exist to test the
+> schema and to develop replay. The real artifacts in `capabilities/` will come from LLM discovery.
+
 ## Layout
 
 | Path | Responsibility |
@@ -60,7 +83,8 @@ uv run ruff check .
 | `cua/hitl/` | Control state machine, intervention store, operator console |
 | `cua/obs/` | Structured event logging, evidence capture |
 | `cua/cli.py` | `cua` CLI entry point |
-| `configs/` | `policy.yaml`, `app_profiles/` |
+| `configs/` | `policy.yaml`, `app_profiles/` (profile YAML + `tenants/` overrides) |
 | `capabilities/` | Saved artifacts (JSON) |
+| `schemas/` | Exported JSON Schemas (`cua artifact schema`) |
 | `evidence/` | Committed, redacted demo evidence |
 | `runs/` | Per-run output (gitignored) |

@@ -32,12 +32,21 @@ from cua.surface.models import (
     ElementHandleRef,
     ElementInfo,
     FrameRef,
+    KeyContext,
     Observation,
     ResolveResult,
 )
 
 _VERDICT_RANK = {"allow": 0, "require_approval": 1, "block": 2}
 _RISK_RANK = {"safe": 0, "risky": 1, "irreversible": 2}
+SUBMIT_KEYS = {"Enter", "NumpadEnter", "Return"}  # can submit the focused element's form
+ACTIVATE_KEYS = {" ", "Space"}  # clicks a focused button/link
+
+Decide = Callable[[str, "_Info", PolicyContext], PolicyDecision]
+
+
+def _strictest(decisions: list[PolicyDecision]) -> PolicyDecision:
+    return max(decisions, key=lambda d: (_VERDICT_RANK[d.verdict], _RISK_RANK[d.risk]))
 
 
 class GuardedActionResult(ActionResult):
@@ -140,7 +149,48 @@ class GuardedSurface(Surface):
         if fp is not None and info.el is not None and (fp.role, fp.name) != (info.role, info.name):
             # Live element differs from the recorded one (drift): the stricter decision wins.
             decisions.append(self.guard.check_action(action, fp.role, fp.name, ctx))
-        return max(decisions, key=lambda d: (_VERDICT_RANK[d.verdict], _RISK_RANK[d.risk]))
+        return _strictest(decisions)
+
+    def _press_decider(self, key: str, target: Target | None) -> Decide:
+        """Enter is classified like a click on the form submit control it would trigger.
+
+        Unknown submit control -> risky. A control whose name matches an irreversible rule (e.g.
+        the commit-verb rule or SUBMIT on the review page) makes the press irreversible.
+        """
+        base_key = key.split("+")[-1]
+
+        def decide(action: str, info: _Info, ctx: PolicyContext) -> PolicyDecision:
+            base = self._decide(action, info, ctx)
+            if base.verdict == "block" or base_key not in SUBMIT_KEYS | ACTIVATE_KEYS:
+                return base
+            kc: KeyContext = self.inner.key_context(target)
+            self._learn(kc.focused)
+            for c in kc.submit_controls:
+                self._learn(c)
+            if base_key in ACTIVATE_KEYS and kc.known and (
+                    kc.focused is None or kc.focused.role not in ("button", "link")):
+                return base  # typing a space into a field
+            if not kc.known or not kc.submit_controls:
+                why = kc.note or "focused element has no known form submit control"
+                return _strictest([base, self.guard.decision_for(
+                    "risky", "press-submit:unknown", f"{key} may submit a form ({why})", ctx)])
+            decisions = [base]
+            for c in kc.submit_controls:
+                cctx = ctx.model_copy(update={"current_url":
+                                              self.inner.current_urls().get(c.frame.key)})
+                d = self.guard.check_action("click", c.role, c.name, cctx)
+                if d.verdict == "block":
+                    decisions.append(d)
+                    continue
+                risk = d.risk if _RISK_RANK[d.risk] >= _RISK_RANK["risky"] else "risky"
+                decisions.append(self.guard.decision_for(
+                    risk, f"press-submit:{d.rule_id}",
+                    self.redactor.redact_text(
+                        f'{key} triggers {c.role} "{c.name}" [{c.frame.key}]: {d.reason}'),
+                    cctx))
+            return _strictest(decisions)
+
+        return decide
 
     def _authorize(self, decision: PolicyDecision, summary: str, ctx: PolicyContext) -> None:
         actor = self._actor(ctx)
@@ -158,7 +208,7 @@ class GuardedSurface(Surface):
 
     def _guarded(self, action: str, target: Target | None, run: Callable[[_Info], ActionResult],
                  log_extra: Callable[[], dict[str, Any]] | None = None,
-                 **log_data: Any) -> GuardedActionResult:
+                 decide: Decide | None = None, **log_data: Any) -> GuardedActionResult:
         base = self.ctx_provider()
         actor = self._actor(base)
         try:
@@ -169,7 +219,7 @@ class GuardedSurface(Surface):
         url = self.inner.current_urls().get(info.frame_key)
         ctx = base.model_copy(update={"current_url": url})
         summary = self._summary(action, info, target)
-        decision = self._decide(action, info, ctx)
+        decision = (decide or self._decide)(action, info, ctx)
         self._authorize(decision, summary, ctx)
         try:
             result = run(info)
@@ -280,8 +330,15 @@ class GuardedSurface(Surface):
 
     def press(self, key: str, target: Target | None = None, *, settle: bool = True
               ) -> GuardedActionResult:
+        """Enter/Space are classified by what they would trigger (see _press_decider)."""
         return self._guarded("press", target,
-                             lambda _: self.inner.press(key, target, settle=settle), key=key)
+                             lambda _: self.inner.press(key, target, settle=settle),
+                             decide=self._press_decider(key, target), key=key)
+
+    def key_context(self, target: Target | None = None) -> KeyContext:
+        kc = self.inner.key_context(target)
+        self._learn(kc.focused)
+        return self.redactor.redact(kc)
 
     # --- read -----------------------------------------------------------------------------------
 

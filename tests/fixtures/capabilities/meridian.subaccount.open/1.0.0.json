@@ -1,0 +1,435 @@
+{
+  "app": {
+    "product": "meridian-core",
+    "product_versions": ">=4.2,<5",
+    "profile": "meridian-core",
+    "surface": "web"
+  },
+  "description": "Opens a new sub-account (share savings, money market or 12-month certificate) with an initial deposit and returns the confirmation number. The SUBMIT step is irreversible and must be approved. HAND-WRITTEN TEST FIXTURE: real artifacts come from discovery.",
+  "id": "meridian.subaccount.open",
+  "inputs": [
+    {
+      "description": "5-digit member number",
+      "example": "12345",
+      "name": "member_id",
+      "pattern": "^\\d{5}$",
+      "required": true,
+      "sensitive": false,
+      "type": "string"
+    },
+    {
+      "description": "Account type, by its label in the core",
+      "enum_values": [
+        "Share Savings",
+        "Money Market",
+        "Certificate 12mo"
+      ],
+      "example": "Money Market",
+      "name": "account_type",
+      "required": true,
+      "sensitive": false,
+      "type": "enum"
+    },
+    {
+      "description": "Initial deposit in dollars",
+      "example": "250.00",
+      "max": "10000",
+      "min": "0.01",
+      "name": "initial_deposit",
+      "required": true,
+      "sensitive": false,
+      "type": "decimal"
+    },
+    {
+      "description": "Optional nickname shown on statements",
+      "example": "Rainy day",
+      "name": "nickname",
+      "pattern": "^[A-Za-z0-9 ]{0,20}$",
+      "required": false,
+      "sensitive": false,
+      "type": "string"
+    }
+  ],
+  "outcomes": [],
+  "outputs": [
+    {
+      "description": "Core confirmation number, e.g. MC-123456",
+      "extract_pattern": "(MC-\\d{6})",
+      "name": "confirmation_number",
+      "normalize": "strip",
+      "nullable": false,
+      "sensitive": false,
+      "type": "string"
+    }
+  ],
+  "preconditions": {
+    "entry_path": "/login",
+    "session": "login_subflow"
+  },
+  "provenance": {
+    "goal_redacted": "Open a sub-account for a member with an initial deposit",
+    "recorder_version": "hand-written",
+    "source": "hand_written"
+  },
+  "review": {},
+  "schema_version": "1.0",
+  "secrets": [],
+  "status": "draft",
+  "steps": [
+    {
+      "action": {
+        "target": {
+          "description": "OPEN SUB-ACCOUNT menu item",
+          "frame": {
+            "name_path": [
+              "nav"
+            ]
+          },
+          "strategies": [
+            {
+              "exact": true,
+              "kind": "role_name",
+              "name": "OPEN SUB-ACCOUNT",
+              "role": "link"
+            },
+            {
+              "exact": true,
+              "kind": "text_match",
+              "role": "link",
+              "text": "OPEN SUB-ACCOUNT"
+            }
+          ]
+        },
+        "type": "click"
+      },
+      "approved": false,
+      "expect": {
+        "all_of": [
+          {
+            "frame": {
+              "name_path": [
+                "main"
+              ]
+            },
+            "kind": "url_matches",
+            "path_glob": "/subacct/open*"
+          }
+        ],
+        "description": "open form loaded",
+        "timeout_ms": 5000
+      },
+      "id": "s01_open_subaccount_form",
+      "intent": "Open the OPEN SUB-ACCOUNT form from the left menu.",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "risky",
+      "settle_timeout_ms": 15000
+    },
+    {
+      "action": {
+        "target": {
+          "description": "MEMBER NO. field",
+          "frame": {
+            "name_path": [
+              "main"
+            ]
+          },
+          "strategies": [
+            {
+              "kind": "label_anchor",
+              "label": "MEMBER NO.",
+              "role": "textbox"
+            }
+          ]
+        },
+        "type": "fill",
+        "value": "{{inputs.member_id}}"
+      },
+      "approved": false,
+      "id": "s02_fill_member_no",
+      "intent": "Type the member number.",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "safe",
+      "settle_timeout_ms": 15000
+    },
+    {
+      "action": {
+        "option": "{{inputs.account_type}}",
+        "target": {
+          "description": "ACCOUNT TYPE dropdown",
+          "frame": {
+            "name_path": [
+              "main"
+            ]
+          },
+          "strategies": [
+            {
+              "kind": "label_anchor",
+              "label": "ACCOUNT TYPE",
+              "role": "combobox"
+            }
+          ]
+        },
+        "type": "select"
+      },
+      "approved": false,
+      "id": "s03_select_account_type",
+      "intent": "Choose the account type.",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "safe",
+      "settle_timeout_ms": 15000
+    },
+    {
+      "action": {
+        "target": {
+          "description": "INITIAL DEPOSIT field",
+          "frame": {
+            "name_path": [
+              "main"
+            ]
+          },
+          "strategies": [
+            {
+              "kind": "label_anchor",
+              "label": "INITIAL DEPOSIT",
+              "role": "textbox"
+            }
+          ]
+        },
+        "type": "fill",
+        "value": "{{inputs.initial_deposit}}"
+      },
+      "approved": false,
+      "id": "s04_fill_initial_deposit",
+      "intent": "Type the initial deposit.",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "safe",
+      "settle_timeout_ms": 15000
+    },
+    {
+      "action": {
+        "target": {
+          "description": "NICKNAME field",
+          "frame": {
+            "name_path": [
+              "main"
+            ]
+          },
+          "strategies": [
+            {
+              "kind": "label_anchor",
+              "label": "NICKNAME",
+              "role": "textbox"
+            }
+          ]
+        },
+        "type": "fill",
+        "value": "{{inputs.nickname}}"
+      },
+      "approved": false,
+      "id": "s05_fill_nickname",
+      "intent": "Type the optional nickname (empty if not given).",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "safe",
+      "settle_timeout_ms": 15000
+    },
+    {
+      "action": {
+        "target": {
+          "description": "CONTINUE button",
+          "frame": {
+            "name_path": [
+              "main"
+            ]
+          },
+          "strategies": [
+            {
+              "exact": true,
+              "kind": "role_name",
+              "name": "CONTINUE",
+              "role": "button"
+            },
+            {
+              "exact": true,
+              "kind": "text_match",
+              "role": "button",
+              "text": "CONTINUE"
+            }
+          ]
+        },
+        "type": "click"
+      },
+      "approved": false,
+      "expect": {
+        "all_of": [
+          {
+            "exact": false,
+            "frame": {
+              "name_path": [
+                "main"
+              ]
+            },
+            "kind": "text_present",
+            "text": "OPEN SUB-ACCOUNT - REVIEW"
+          }
+        ],
+        "description": "review page",
+        "timeout_ms": 5000
+      },
+      "id": "s06_click_continue",
+      "intent": "Validate the entries; the core shows a review page or a business outcome.",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "risky",
+      "settle_timeout_ms": 15000
+    },
+    {
+      "action": {
+        "target": {
+          "description": "SUBMIT image button on the review page",
+          "frame": {
+            "name_path": [
+              "main"
+            ]
+          },
+          "strategies": [
+            {
+              "exact": true,
+              "kind": "role_name",
+              "name": "SUBMIT",
+              "role": "button"
+            }
+          ]
+        },
+        "type": "click"
+      },
+      "approved": false,
+      "expect": {
+        "all_of": [
+          {
+            "exact": false,
+            "frame": {
+              "name_path": [
+                "main"
+              ]
+            },
+            "kind": "text_present",
+            "text": "SUB-ACCOUNT OPENED"
+          }
+        ],
+        "description": "confirmation shown",
+        "timeout_ms": 10000
+      },
+      "id": "s07_submit",
+      "intent": "Commit the new sub-account. Final and cannot be reversed.",
+      "notes": "Never retried: a retry after an ambiguous failure could open two accounts.",
+      "requires_approval": true,
+      "retry": {
+        "backoff_ms": 0,
+        "max_attempts": 1,
+        "on": []
+      },
+      "risk": "irreversible",
+      "settle_timeout_ms": 15000
+    },
+    {
+      "action": {
+        "output": "confirmation_number",
+        "target": {
+          "description": "confirmation banner",
+          "frame": {
+            "name_path": [
+              "main"
+            ]
+          },
+          "strategies": [
+            {
+              "exact": false,
+              "kind": "text_match",
+              "text": "SUB-ACCOUNT OPENED — CONFIRMATION NO."
+            }
+          ]
+        },
+        "type": "extract"
+      },
+      "approved": false,
+      "id": "s08_extract_confirmation_number",
+      "intent": "Read the confirmation number from the confirmation banner.",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "safe",
+      "settle_timeout_ms": 15000
+    }
+  ],
+  "success": {
+    "all_of": [
+      {
+        "exact": false,
+        "frame": {
+          "name_path": [
+            "main"
+          ]
+        },
+        "kind": "text_present",
+        "text": "SUB-ACCOUNT OPENED — CONFIRMATION NO. MC-"
+      }
+    ],
+    "description": "confirmation page",
+    "timeout_ms": 5000
+  },
+  "title": "Open a sub-account for a member",
+  "use_profile_outcomes": [
+    "member_not_found",
+    "invalid_member_format",
+    "access_denied",
+    "deposit_out_of_range",
+    "invalid_deposit_amount"
+  ],
+  "version": "1.0.0"
+}

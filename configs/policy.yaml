@@ -73,17 +73,7 @@ mode_rules:
       requires: [artifact_approved, step_approved]
       otherwise: require_approval
 
-# Case-insensitive, matched as whole words against row labels / column headers / field labels.
-sensitive_labels:
-  - SSN
-  - SOCIAL SECURITY
-  - ADDRESS
-  - PHONE
-  - EMAIL
-  - DOB
-  - DATE OF BIRTH
-  - ACCOUNT NUMBER
-  - PASSWORD
-  - OPERATOR PASSWORD
-  - MEMBER NAME
-  - NAME
+# Sensitive labels have a single source of truth: the app profile. They are matched as
+# case-insensitive whole words against row labels, column headers and field labels. Any labels
+# listed inline here under `sensitive_labels` are merged on top. The path is relative to this file.
+sensitive_labels_from: app_profiles/meridian-core.yaml

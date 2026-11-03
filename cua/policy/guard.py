@@ -96,6 +96,12 @@ class PolicyGuard:
             return False
         return True
 
+    def decision_for(self, risk: Risk, rule_id: str, reason: str, ctx: PolicyContext
+                     ) -> PolicyDecision:
+        """A decision for an externally classified risk, using this policy's mode rules."""
+        return PolicyDecision(verdict=self._verdict(risk, ctx), risk=risk, rule_id=rule_id,
+                              reason=reason)
+
     def _verdict(self, risk: Risk, ctx: PolicyContext):
         rule = self.config.mode_rules[ctx.mode][risk]
         if isinstance(rule, ConditionalVerdict):

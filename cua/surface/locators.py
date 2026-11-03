@@ -5,11 +5,13 @@ semantics are identical. Only CssPath needs the live DOM; it is matched by the s
 """
 
 import re
-from typing import Annotated, Literal
+from collections.abc import Mapping
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
 from cua.surface.models import BBox, FrameRef, Role, ScannedElement
+from cua.templating import INPUT_TEMPLATE
 
 
 class RoleName(BaseModel):
@@ -28,12 +30,25 @@ class LabelAnchor(BaseModel):
 
 
 class TableCell(BaseModel):
-    """The cell in column `column_header` of the row containing a cell equal to `row_key`."""
+    """The cell in column `column_header` of the row containing a cell equal to `row_key`.
+
+    `row_key` is the only locator field that may be parameterized. Its whole value may be
+    `{{inputs.<name>}}`, e.g. "the NAME cell of the result row for the member searched". It is a
+    structural position keyed by a declared, non-sensitive input, so no PII ever lives in the
+    artifact. Artifact lint enforces that. The template is bound with TargetSpec.bind() before
+    resolving. Matching an unbound template is a programming error.
+    """
 
     kind: Literal["table_cell"] = "table_cell"
     section_header: str | None = None
     row_key: str
     column_header: str
+
+    @property
+    def row_key_input(self) -> str | None:
+        """Input name if row_key is an `{{inputs.x}}` template, else None (a literal)."""
+        m = INPUT_TEMPLATE.match(self.row_key)
+        return m.group(1) if m else None
 
 
 class TextMatch(BaseModel):
@@ -72,6 +87,27 @@ class TargetSpec(BaseModel):
     description: str
     fingerprint: Fingerprint | None = None
 
+    @property
+    def input_names(self) -> list[str]:
+        """Inputs this target is parameterized by (TableCell.row_key templates only)."""
+        return [s.row_key_input for s in self.strategies
+                if isinstance(s, TableCell) and s.row_key_input]
+
+    def bind(self, inputs: Mapping[str, Any]) -> "TargetSpec":
+        """Copy with every `{{inputs.x}}` row_key replaced by the input's value."""
+        if not self.input_names:
+            return self
+        strategies = []
+        for s in self.strategies:
+            name = s.row_key_input if isinstance(s, TableCell) else None
+            if name is not None:
+                if inputs.get(name) is None:
+                    raise ValueError(f"cannot bind target {self.description!r}: "
+                                     f"input {name!r} has no value")
+                s = s.model_copy(update={"row_key": str(inputs[name])})
+            strategies.append(s)
+        return self.model_copy(update={"strategies": strategies})
+
 
 _LEADING_GLYPHS = re.compile(r"^[»›•·]+\s*")
 
@@ -99,6 +135,9 @@ def match(strategy: Strategy, elements: list[ScannedElement]) -> list[ScannedEle
                 if e.kind == "interactive" and e.role == strategy.role
                 and label in (norm_text(t) for t in e.row_texts)]
     if isinstance(strategy, TableCell):
+        if strategy.row_key_input:
+            raise ValueError(f"unbound row_key template {strategy.row_key!r}; "
+                             "call TargetSpec.bind(inputs) before resolving")
         row_key, column = norm_text(strategy.row_key), norm_text(strategy.column_header)
         section = norm_text(strategy.section_header) if strategy.section_header else None
         out = []
