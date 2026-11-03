@@ -58,6 +58,16 @@ against.
 - The model sees only redacted text (system prompt, observations, tool results) and never sees
   credentials. Tests use ScriptedLLMClient only; never call Bedrock from tests.
 
+## Replay (built)
+
+- `cua/replay/`: `result.py` (ReplayResult + failure-category table with fixed retryable flags),
+  `engine.py` (phases 0-3 + condition sweep), `session.py` (wiring), `harness.py` (test-only
+  fault injection, recorded in the manifest). It must never import cua.discovery/boto3 (tested).
+- Approval is checked on the BASE artifact before any tenant override. A risky step is never
+  executed on a css_path-only match (`structural_only_on_risky`). Irreversible steps are never
+  retried, and session loss after one is `session_expired_after_commit` (no re-login).
+- The Escalator protocol lives in `cua/hitl/escalation.py`, shared by discovery and replay.
+
 ## Conventions
 
 - Python 3.11, managed with `uv`. Use the Playwright **sync** API everywhere.

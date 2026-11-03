@@ -58,11 +58,12 @@ def discover(tmp_path):
 
     def run(base_url: str, script, *, member: str = "12345", inputs=None, outputs=None,
             capability_id: str = "meridian.member.read_savings_balance", approver=None,
-            goal: str | None = None, **config):
+            goal: str | None = None, description: str | None = None, **config):
         llm = script if isinstance(script, ScriptedLLMClient) else ScriptedLLMClient(script)
         g = DiscoveryGoal(
             goal=goal or f"Look up member {member} and read their Share Savings balance",
             capability_id=capability_id, title="Read a member's share savings balance",
+            description=description,
             inputs=inputs if inputs is not None else [{**MEMBER_INPUT, "value": member}],
             outputs=outputs if outputs is not None else [BALANCE_OUTPUT],
             base_url=base_url)

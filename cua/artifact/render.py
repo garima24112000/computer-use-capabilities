@@ -70,9 +70,20 @@ def _target_line(step: Step) -> str | None:
     t = getattr(step.action, "target", None)
     if t is None:
         return None
-    kinds = " → ".join(s.kind for s in t.strategies)
+    kinds = " → ".join(_strategy(s) for s in t.strategies)
     param = f"; keyed by `{{{{inputs.{', '.join(t.input_names)}}}}}`" if t.input_names else ""
     return f"frame `{t.frame.key}`; locators: {kinds}{param}"
+
+
+def _strategy(s: Any) -> str:
+    """Kind, plus the keys a reviewer needs to judge stability (row key, label, text)."""
+    if s.kind == "table_cell":
+        return f"table_cell(row={s.row_key!r}, col={s.column_header!r})"
+    if s.kind == "label_anchor":
+        return f"label_anchor({s.label!r})"
+    if s.kind == "text_match" and not s.exact:
+        return f"text_match(contains {s.text!r})"
+    return s.kind
 
 
 def summary_markdown(cap: "Capability") -> str:

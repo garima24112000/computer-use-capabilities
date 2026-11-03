@@ -52,6 +52,7 @@ class DiscoveryGoal(BaseModel):
     goal: str
     capability_id: str
     title: str
+    description: str | None = None  # defaults to the title; the goal text is never copied
     inputs: list[GoalInput] = Field(default_factory=list)
     outputs: list[GoalOutput] = Field(default_factory=list)
     tenant: str = "a"

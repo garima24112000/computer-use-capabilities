@@ -10,7 +10,7 @@ them.
 import hashlib
 import time
 from collections.abc import Callable
-from typing import Any, Literal, Protocol
+from typing import Any, Literal
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel, Field
@@ -37,6 +37,12 @@ from cua.discovery.prompts import COMPACTED, PROMPT_VERSION, system_prompt, turn
 from cua.discovery.recorder import Recorder
 from cua.discovery.tools import TOOLS, ToolValidationError, ValidatedCall, validate_call
 from cua.execute import StepFailed, check_checkpoint, run_action, run_steps
+from cua.hitl.escalation import (
+    EscalationDecision,
+    EscalationRequest,
+    Escalator,
+    StopEscalator,
+)
 from cua.obs.events import EventLogger
 from cua.obs.evidence import EvidenceCapture
 from cua.obs.transcript import TranscriptWriter
@@ -47,31 +53,7 @@ from cua.surface.errors import SurfaceError
 from cua.surface.models import Observation
 from cua.templating import render
 
-# --- escalation seam (step 7 plugs the HITL operator in here) -------------------------------------
-
-
-class EscalationRequest(BaseModel):
-    reason: str
-    raised_by: Literal["agent", "system"]
-    run_id: str
-    turn: int
-    evidence: dict[str, str] = {}
-
-
-class EscalationDecision(BaseModel):
-    resume: bool = False
-    note: str | None = None  # passed to the model as the "last action result" when resuming
-
-
-class Escalator(Protocol):
-    def escalate(self, request: EscalationRequest) -> EscalationDecision: ...
-
-
-class StopEscalator:
-    """Default: the escalation is logged with evidence by the agent; the run stops."""
-
-    def escalate(self, request: EscalationRequest) -> EscalationDecision:
-        return EscalationDecision(resume=False)
+# Escalation seam lives in cua.hitl.escalation (shared with replay).
 
 
 class _Stop(Exception):
@@ -405,39 +387,46 @@ class DiscoveryAgent:
                                      "consecutive actions")
         return False
 
+    def _extract(self, call: ValidatedCall, el, pre: Observation, goal: DiscoveryGoal,
+                 result: DiscoveryResult, seen_values: set[tuple[str, str, str]]
+                 ) -> tuple[str, Observation, bool]:
+        desc = f'extract {el.role} "{el.name}"'
+        out = next(o for o in goal.outputs if o.name == call.output)
+        field = OutputField(name=out.name, type=out.type, description=out.name,
+                            normalize=out.normalize, extract_pattern=out.extract_pattern)
+        try:
+            raw_text = self.surface.read_text(call.ref)  # redacted per sensitivity
+            value = field.normalize_value(raw_text)
+            target = self.recorder.target_for(call.ref, el, raw_text, extracted=value,
+                                              pattern=out.extract_pattern, obs=pre)
+        except ValueError as exc:
+            return f"error: {desc}: {exc}", pre, False
+        except SurfaceError as exc:
+            return f"error: {desc}: cannot record a durable locator ({exc})", pre, False
+        if out.sensitive and value:
+            self.redactor.register_sensitive(value, "OUTPUT")
+        result.outputs[out.name] = value
+        self.recorder.record_extract(call, target, el)
+        result.actions_executed += 1
+        self.log.emit("action", "agent", self._ctx.step_id, action=f"extract {call.output}",
+                      ok=True, value=value)
+        key = ("extract", call.output or "", value or "")
+        novel = key not in seen_values
+        seen_values.add(key)
+        return f"ok: extracted {call.output} = {value}", pre, novel
+
     def _act(self, call: ValidatedCall, pre: Observation, goal: DiscoveryGoal,
              inputs: dict[str, str], result: DiscoveryResult,
              seen_values: set[tuple[str, str, str]]) -> tuple[str, Observation, bool]:
         el = next(e for e in pre.elements if e.ref == call.ref) if call.ref else None
         pre_fp = fingerprint(pre)
         desc = f'{call.name} {el.role} "{el.name}"' if el else call.name
-        raw_text: str | None = None
+        if call.name == "extract":
+            return self._extract(call, el, pre, goal, result, seen_values)
         try:
-            if call.name == "extract":
-                raw_text = self.surface.read_text(call.ref)  # redacted per sensitivity
-            target = self.recorder.target_for(call.ref, el, raw_text) if el else None
+            target = self.recorder.target_for(call.ref, el) if el else None
         except SurfaceError as exc:
             return f"error: {desc}: cannot record a durable locator ({exc})", pre, False
-
-        if call.name == "extract":
-            out = next(o for o in goal.outputs if o.name == call.output)
-            field = OutputField(name=out.name, type=out.type, description=out.name,
-                                normalize=out.normalize, extract_pattern=out.extract_pattern)
-            try:
-                value = field.normalize_value(raw_text)
-            except ValueError as exc:
-                return f"error: {desc}: {exc}", pre, False
-            if out.sensitive and value:
-                self.redactor.register_sensitive(value, "OUTPUT")
-            result.outputs[out.name] = value
-            self.recorder.record_extract(call, target, el)
-            result.actions_executed += 1
-            self.log.emit("action", "agent", self._ctx.step_id, action=f"extract {call.output}",
-                          ok=True, value=value)
-            key = ("extract", call.output or "", value or "")
-            novel = key not in seen_values
-            seen_values.add(key)
-            return f"ok: extracted {call.output} = {value}", pre, novel
 
         self.surface.last_dispatched = None
         try:

@@ -182,3 +182,20 @@ def test_extra_fields_and_off_grammar_templates_are_rejected(read_raw):
     data = raw()
     data["steps"][0]["action"] = {"type": "navigate", "url_path": "https://evil.example/"}
     assert "app-relative path" in lint_errors(data)
+
+
+def test_extract_structural_only_is_error_for_discovery_warning_for_hand_written(read_raw):
+    extract = step(read_raw, "s05_extract_savings_balance")
+    extract["action"]["target"]["strategies"] = [{"kind": "css_path", "selector": "html > b"}]
+    report = validate(read_raw).lint()
+    assert report.ok and "extract_structural_only" in report.codes()  # hand_written: warning
+    read_raw["provenance"]["source"] = "discovery"
+    assert "[extract_structural_only]" in lint_errors(read_raw)
+
+
+def test_input_literal_in_free_text_is_a_warning(read_raw):
+    read_raw["description"] = "Reads the balance for member 12345."
+    step(read_raw, "s03_click_inquire")["intent"] = "Search for 12345."
+    warnings = [w for w in validate(read_raw).lint().warnings
+                if w.code == "input_literal_in_text"]
+    assert [w.path for w in warnings] == ["description", "steps[2:s03_click_inquire].intent"]

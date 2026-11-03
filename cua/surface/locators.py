@@ -22,7 +22,12 @@ class RoleName(BaseModel):
 
 
 class LabelAnchor(BaseModel):
-    """The control of `role` in the same table row as a cell whose text equals `label`."""
+    """The control of `role` in the same table row as a cell whose text equals `label`.
+
+    For non-interactive roles (cell/text) it selects the VALUE next to the label: an element of
+    that role in the row, other than the label itself. This locates read-only values such as
+    "BRANCH | 001 - MAIN OFFICE".
+    """
 
     kind: Literal["label_anchor"] = "label_anchor"
     label: str
@@ -132,7 +137,8 @@ def match(strategy: Strategy, elements: list[ScannedElement]) -> list[ScannedEle
     if isinstance(strategy, LabelAnchor):
         label = norm_text(strategy.label)
         return [e for e in elements
-                if e.kind == "interactive" and e.role == strategy.role
+                if e.role == strategy.role
+                and (e.kind == "interactive" or norm_text(e.name) != label)
                 and label in (norm_text(t) for t in e.row_texts)]
     if isinstance(strategy, TableCell):
         if strategy.row_key_input:

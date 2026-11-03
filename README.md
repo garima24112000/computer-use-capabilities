@@ -5,8 +5,8 @@ typed, versioned capability artifact, and that artifact is replayed deterministi
 in the loop. The project also includes human-in-the-loop handoff and safety guardrails. See
 [CLAUDE.md](CLAUDE.md) for the project rules.
 
-> Status: target app, surface layer, guardrails, the capability artifact schema and LLM discovery
-> are built. The replay engine and HITL console come in later steps.
+> Status: target app, surface layer, guardrails, the capability artifact schema, LLM discovery and
+> deterministic replay are built. The HITL console comes next.
 
 ## Install
 
@@ -64,6 +64,23 @@ uv run cua discover \
 Each run writes `runs/<run_id>/` (events, redacted transcript, masked step screenshots,
 summary.json) and a **draft** artifact in `capabilities/<id>/<version>.json`. Irreversible
 actions ask for approval at the terminal (`--approve-mode deny` refuses them).
+
+## Replay a capability (no LLM, no cloud credentials)
+
+```bash
+uv run cua replay meridian.member.read_savings_balance --input member_id=12345        # exit 0
+uv run cua replay meridian.member.read_savings_balance --input member_id=99999        # exit 10
+uv run cua replay meridian.member.read_savings_balance --input member_id=12345 --tenant b
+uv run cua replay meridian.member.read_savings_balance --input member_id=12345 --repeat 5
+uv run cua replay meridian.member.read_savings_balance --input member_id=12345 --json
+# test harness only (POSTs /__faults, recorded in the run manifest):
+uv run cua replay meridian.member.read_savings_balance --input member_id=12345 \
+  --inject-at s03_click_inquire '{"interstitial_count": 1}'
+```
+
+Exit codes: 0 success, 10 business outcome, 20 failed, 30 escalated, 2 invalid invocation.
+Artifacts with irreversible steps replay only after `cua artifact approve`. Every run writes
+`runs/<run_id>/result.json` (the typed `ReplayResult`), events and masked step screenshots.
 
 ## Capability artifacts
 

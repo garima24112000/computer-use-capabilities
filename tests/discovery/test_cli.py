@@ -90,6 +90,32 @@ def test_invalid_outputs_and_id_fail_fast(no_side_effects):
         assert msg in result.output
 
 
+def test_bounds_input_desc_and_extract_pattern_parse():
+    assert parse_input("initial_deposit=250.00:decimal:0.01..10000") == {
+        "name": "initial_deposit", "value": "250.00", "type": "decimal", "required": True,
+        "min": "0.01", "max": "10000"}
+    assert parse_input("n=3:integer:..5")["max"] == "5" and "min" not in parse_input(
+        "n=3:integer:..5")
+    assert parse_output(r"confirmation_number:string:strip:(MC-\d{6})") == {
+        "name": "confirmation_number", "type": "string", "normalize": "strip",
+        "extract_pattern": r"(MC-\d{6})"}
+    assert parse_output("t:string:none:(a:b)")["extract_pattern"] == "(a:b)"
+
+
+@pytest.mark.parametrize("extra, message", [
+    (["--input", "initial_deposit=0:decimal:0.01..10000"], "must be >= 0.01"),
+    (["--input", "initial_deposit=5:decimal:ten..20"], "bounds must look like min..max"),
+    (["--input", "initial_deposit=5:decimal:9..1"], "min > max"),
+    (["--output", r"x:string:strip:MC-\d{6}"], "exactly one capture group"),
+    (["--output", r"x:string:strip:(MC-(\d{6}))"], "exactly one capture group"),
+    (["--input-desc", "nope=hello"], "undeclared input"),
+])
+def test_contract_extensions_fail_fast(no_side_effects, extra, message):
+    result = CliRunner().invoke(app, [*OPEN_ARGS, *extra, "--runs-dir", str(no_side_effects)])
+    assert result.exit_code == 2 and message in result.output, result.output
+    assert not no_side_effects.exists()
+
+
 def test_fixed_run2_command_passes_validation():
     specs = [parse_input(r"member_id=22222:string:^\d{5}$"),
              parse_input("account_type=Money Market:enum:Share Savings|Money Market|"

@@ -32,7 +32,7 @@ from cua.policy.models import PolicyDecision
 from cua.policy.redaction import Redactor
 from cua.surface.base import Surface
 from cua.surface.errors import SurfaceError, TargetNotFound
-from cua.surface.locators import CssPath, TableCell, TargetSpec, TextMatch
+from cua.surface.locators import CssPath, LabelAnchor, RoleName, TableCell, TargetSpec, TextMatch
 from cua.surface.models import ElementInfo, Observation
 from cua.templating import placeholders
 
@@ -107,8 +107,9 @@ class Recorder:
 
     # --- targets --------------------------------------------------------------------------------
 
-    def target_for(self, ref: str, el: ElementInfo, extract_text: str | None = None
-                   ) -> TargetSpec:
+    def target_for(self, ref: str, el: ElementInfo, extract_text: str | None = None,
+                   extracted: str | None = None, pattern: str | None = None,
+                   obs: Observation | None = None) -> TargetSpec:
         """Durable, PII-safe TargetSpec for `ref` (call BEFORE acting: the ref must be live)."""
         spec = self.surface.describe(ref)
         strategies = list(spec.strategies)
@@ -136,29 +137,96 @@ class Recorder:
         strategies = [s for s in strategies if isinstance(s, TableCell) or not any(
             isinstance(v, str) and v in values for v in s.model_dump().values())]
         description = self._templated(spec.description)
-        if extract_text:
-            strategies = self._stable_for_extract(strategies, spec, el, extract_text)
+        if extract_text is not None:
+            strategies = self._stable_for_extract(strategies, spec, el, extract_text,
+                                                  extracted, pattern, obs)
             description = description.replace(" ".join(extract_text.split()), "<value>")
+        fingerprint = spec.fingerprint
+        if fingerprint is not None and extract_text is not None:
+            # The fingerprint (diagnostics) must not carry this run's value either.
+            name = fingerprint.name.replace(extracted, "<value>") if extracted \
+                else fingerprint.name
+            raw = " ".join(extract_text.split())
+            name = name.replace(raw, "<value>") if raw else name
+            fingerprint = fingerprint.model_copy(update={"name": name})
         if not strategies:
             raise SurfaceError("no PII-safe, stable strategy identifies this element")
-        return spec.model_copy(update={"strategies": strategies, "description": description})
+        return spec.model_copy(update={"strategies": strategies, "description": description,
+                                       "fingerprint": fingerprint})
+
+    def _probe(self, spec: TargetSpec, strategy, el: ElementInfo) -> bool:
+        return self._same_element(
+            TargetSpec(frame=spec.frame, strategies=[strategy], description="probe"), el)
 
     def _stable_for_extract(self, strategies: list, spec: TargetSpec, el: ElementInfo,
-                            raw: str) -> list:
-        """Drop strategies that embed the value being read (it changes per run); add a
-        text-prefix match when the label part of the text is stable."""
+                            raw: str, extracted: str | None, pattern: str | None,
+                            obs: Observation | None) -> list:
+        """Locators for a value that changes every run, in order: TableCell (business-label
+        row key first), LabelAnchor (value next to its label), TextMatch on the stable part
+        of the text; css_path last. Every candidate is validated on the live page."""
         raw_n = " ".join(raw.split())
-        kept = [s for s in strategies
-                if raw_n not in json.dumps(s.model_dump(), ensure_ascii=False)]
-        m = re.search(r"\d", raw_n)
-        prefix = raw_n[:m.start()].strip() if m else ""
-        if len(prefix) >= 8:
-            cand = TextMatch(text=prefix, role=el.role, exact=False)
-            probe = TargetSpec(frame=spec.frame, strategies=[cand], description="probe")
-            if self._same_element(probe, el):
-                at = next((k for k, s in enumerate(kept) if isinstance(s, CssPath)), len(kept))
-                kept.insert(at, cand)
-        return kept
+        kept = [s for s in strategies if not raw_n
+                or raw_n not in json.dumps(s.model_dump(), ensure_ascii=False)]
+        semantic: list = []
+        # 1. data grid: prefer a business label in the row (e.g. "Share Savings") over a code
+        #    (e.g. suffix "00"); keep the code-keyed cell as the fallback.
+        cells = [s for s in kept if isinstance(s, TableCell)]
+        for cell in cells:
+            label = self._business_row_label(el, cell, obs)
+            if label and label != cell.row_key:
+                cand = cell.model_copy(update={"row_key": label})
+                if self._probe(spec, cand, el):
+                    semantic.append(cand)
+            semantic.append(cell)
+        # 2. value next to its label cell ("BRANCH | 001 - MAIN OFFICE").
+        tc = el.table_context
+        label = tc.row_key if tc and tc.row_key and tc.row_key != el.name else None
+        if label and not tc.column_header and not self.redactor.labels.kind_for(label):
+            cand = LabelAnchor(label=label, role=el.role)
+            if self._probe(spec, cand, el):
+                semantic.append(cand)
+        # 3. the stable part of the element's own text, e.g. "SUB-ACCOUNT OPENED — CONFIRMATION
+        #    NO." once the value (the extract_pattern group) is cut out.
+        stable = self._stable_text(raw_n, extracted, pattern)
+        if stable:
+            cand = TextMatch(text=stable, role=el.role, exact=False)
+            if self._probe(spec, cand, el):
+                semantic.append(cand)
+        structural = [s for s in kept if isinstance(s, CssPath)]
+        others = [s for s in kept if not isinstance(s, TableCell | CssPath)]
+        return semantic + others + structural
+
+    @staticmethod
+    def _stable_text(raw: str, extracted: str | None, pattern: str | None) -> str:
+        text = raw
+        if pattern and (m := re.search(pattern, raw)):
+            text = raw[:m.start(1)] + " " + raw[m.end(1):]
+        elif extracted and extracted in raw:
+            text = raw.replace(extracted, " ")
+        else:
+            text = re.sub(r"[$\d][\d,.\-]*", " ", raw)
+        text = " ".join(text.split()).strip(" -—:")
+        return text if len(text) >= 6 and re.search(r"[A-Za-z]{3}", text) else ""
+
+    def _business_row_label(self, el: ElementInfo, cell: TableCell,
+                            obs: Observation | None) -> str | None:
+        """A non-numeric, non-sensitive cell text in the same row, e.g. "Share Savings"."""
+        if obs is None or not re.fullmatch(r"[\d\W]+", cell.row_key or ""):
+            return None
+        tc = el.table_context
+        for other in obs.elements:
+            otc = other.table_context
+            if (other is el or otc is None or other.frame.key != el.frame.key
+                    or otc.row_key != tc.row_key
+                    or otc.table_caption_or_header != tc.table_caption_or_header
+                    or otc.column_header == tc.column_header):
+                continue
+            name = other.name
+            if (re.search(r"[A-Za-z]{3}", name) and "[REDACTED" not in name
+                    and self.redactor.redact_text(name) == name
+                    and name not in self.inputs.values()):
+                return name
+        return None
 
     # --- recording ------------------------------------------------------------------------------
 
@@ -246,9 +314,37 @@ class Recorder:
                     continue
                 conds.append(TextPresent(frame=frames.get(key), text=text))
                 break
+        if not conds:
+            conds = self._new_content(pre, post, frames)
         conds = self._validated(conds)
         return Checkpoint(description="postcondition recorded during discovery",
                           all_of=conds) if conds else None
+
+    def _new_content(self, pre: Observation, post: Observation, frames: dict
+                     ) -> list[Condition]:
+        """URL and section header unchanged (e.g. a search on the same page): expect the
+        newly appeared data-grid column headers, located by role + exact name."""
+        old = {(e.frame.key, e.name) for e in pre.elements}
+        headers = {(e.frame.key, e.table_context.column_header) for e in post.elements
+                   if e.table_context and e.table_context.column_header}
+        conds: list[Condition] = []
+        for e in post.elements:
+            if (e.frame.key, e.name) not in headers or (e.frame.key, e.name) in old:
+                continue
+            if (e.table_context and e.table_context.column_header) or "[REDACTED" in e.name \
+                    or self.redactor.redact_text(e.name) != e.name \
+                    or _UNSTABLE.search(self._templated(e.name)):
+                continue
+            target = TargetSpec(frame=e.frame, description=f"column header {e.name!r}",
+                                strategies=[RoleName(role=e.role, name=e.name)])
+            try:
+                self.surface.resolve(target)
+            except (TargetNotFound, SurfaceError):
+                continue
+            conds.append(TargetPresent(target=target))
+            if len(conds) == 2:
+                break
+        return conds
 
     def finalize_success(self) -> None:
         """Success = the last navigation's expectations + every Extract target present.
@@ -284,20 +380,9 @@ class Recorder:
         return self.goal.contract()  # validated before the run started; cannot drift
 
     def _outcomes(self) -> list[str]:
-        visited_frames = {k for k, _ in self.visited}
-        out = []
-        for o in self.profile.outcomes:
-            ok = True
-            for _, c in o.detect.conditions():
-                frame = getattr(c, "frame", None)
-                if frame is not None and frame.key not in visited_frames:
-                    ok = False
-                if isinstance(c, UrlMatches) and not any(
-                        re.fullmatch(c.path_glob.replace("*", ".*"), p) for _, p in self.visited):
-                    ok = False
-            if ok:
-                out.append(o.id)
-        return out or [o.id for o in self.profile.outcomes]
+        """Profile outcomes whose scope_paths match a page this run visited."""
+        visited = {p for _, p in self.visited}
+        return [o.id for o in self.profile.outcomes if o.in_scope(visited)]
 
     def build(self, model_id: str, transcript_sha256: str | None
               ) -> tuple[Path | None, Path | None, list[str], Capability | None]:
@@ -309,7 +394,9 @@ class Recorder:
             steps.append({**p.step, "id": f"s{n:02d}_{p.verb}_{p.slug}"})
         data = {
             "schema_version": "1.0", "id": self.goal.capability_id, "version": version,
-            "title": self.goal.title, "description": self.redactor.redact_text(self.goal.goal),
+            "title": self._templated(self.goal.title),
+            # Never the goal: it holds this run's values. The redacted goal is in provenance.
+            "description": self._templated(self.goal.description or self.goal.title),
             "status": "draft",
             "app": {"product": self.profile.product,
                     "product_versions": self.profile.product_versions,

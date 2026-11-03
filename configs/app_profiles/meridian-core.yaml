@@ -146,6 +146,7 @@ outcomes:
   - id: member_not_found
     code: MEMBER_NOT_FOUND
     description: No member exists with the given number.
+    scope_paths: ["/inquiry*", "/member/*", "/subacct/*"]
     message_template: No records found for the requested member number.
     detect:
       description: not-found notice in the main frame
@@ -155,6 +156,7 @@ outcomes:
   - id: invalid_member_format
     code: INVALID_MEMBER_FORMAT
     description: The core rejected the member number format.
+    scope_paths: ["/inquiry*", "/member/*", "/subacct/*"]
     message_template: The member number format was rejected by the core system.
     detect:
       description: format error in the main frame
@@ -164,6 +166,7 @@ outcomes:
   - id: access_denied
     code: ACCESS_DENIED
     description: The operator lacks privilege for this member (restricted record, code 403-R).
+    scope_paths: ["/inquiry*", "/member/*", "/subacct/*"]
     message_template: Access denied for this member (code 403-R).
     detect:
       description: access-denied notice in the main frame
@@ -173,6 +176,7 @@ outcomes:
   - id: deposit_out_of_range
     code: DEPOSIT_OUT_OF_RANGE
     description: Initial deposit must be > 0 and <= 10,000.00.
+    scope_paths: ["/subacct/*"]
     message_template: The initial deposit is out of the allowed range.
     detect:
       description: deposit range error on the open form
@@ -182,6 +186,7 @@ outcomes:
   - id: invalid_deposit_amount
     code: INVALID_DEPOSIT_AMOUNT
     description: The core could not parse the initial deposit.
+    scope_paths: ["/subacct/*"]
     message_template: The initial deposit amount is not a valid number.
     detect:
       description: deposit parse error on the open form

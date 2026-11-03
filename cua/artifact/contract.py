@@ -248,3 +248,13 @@ class OutcomeSpec(BaseModel):
     message_template: InputTemplate
     detect: Checkpoint
     check_after_steps: list[str] | Literal["*"] = "*"
+    # URL-path globs where this outcome can occur (empty = anywhere). Discovery inherits only
+    # profile outcomes whose scope matches a page the run visited; replay only checks an
+    # outcome while a frame shows an in-scope path.
+    scope_paths: list[str] = Field(default_factory=list)
+
+    def in_scope(self, paths: "set[str] | list[str]") -> bool:
+        from fnmatch import fnmatch
+
+        return not self.scope_paths or any(fnmatch(p, g) for p in paths
+                                           for g in self.scope_paths)

@@ -7,7 +7,9 @@ Replay consults it between steps. The profile is also the single source of truth
 `sensitive_labels`, and configs/policy.yaml points at it via `sensitive_labels_from`.
 """
 
+import os
 import re
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Literal
 
@@ -100,6 +102,11 @@ class AppProfile(_M):
 
     def lint(self) -> LintReport:
         return lint_profile(self)
+
+    def missing_secrets(self, env: Mapping[str, str] | None = None) -> list[str]:
+        """Names of the profile's secrets absent from the environment."""
+        env = os.environ if env is None else env
+        return [s.name for s in self.secrets if s.name not in env]
 
     def outcome(self, outcome_id: str) -> OutcomeSpec | None:
         return next((o for o in self.outcomes if o.id == outcome_id), None)

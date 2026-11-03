@@ -39,6 +39,8 @@ class RunManifest(BaseModel):
     model_id: str | None = None
     git_commit: str | None = None
     trace_enabled: bool = False
+    # Test-harness fault injections (POST /__faults, never through the agent surface).
+    harness_faults: list[dict] = []
 
 
 def _git_commit() -> str | None:

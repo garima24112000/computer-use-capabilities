@@ -83,6 +83,9 @@ def check_condition(surface: Surface, c: Condition, inputs: Mapping[str, Any]
                                observed=f"path {path}" if path else "frame not present")
     if isinstance(c, TextPresent | TextAbsent):
         text, wanted = _text(surface, c.frame), _norm(render(c.text, inputs))
+        redactor = getattr(surface, "redactor", None)
+        if redactor is not None:  # a GuardedSurface returns redacted text: compare like with like
+            wanted = redactor.redact_text(wanted)
         present = text == wanted if getattr(c, "exact", False) else wanted in text
         ok = present if isinstance(c, TextPresent) else not present
         return ConditionResult(condition=desc, ok=ok, observed=f"frame text: {text[:160]!r}")

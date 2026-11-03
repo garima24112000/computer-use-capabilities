@@ -323,7 +323,8 @@ class PlaywrightSurface(Surface):
     def _frame_for(self, ref: FrameRef) -> Frame | None:
         f = self.page.main_frame
         for name in ref.name_path:
-            nxt = next((c for c in f.child_frames if self._child_name(f, c) == name), None)
+            nxt = next((c for c in f.child_frames
+                        if not c.is_detached() and self._child_name(f, c) == name), None)
             if nxt is None:
                 return self._frame_by_url(ref)
             f = nxt
@@ -400,7 +401,7 @@ class PlaywrightSurface(Surface):
         frame = self._frame_for(el.frame)
         if frame is None:
             raise ActionFailed("describe", ref, f"frame {el.frame.key} is gone")
-        scanned, _ = self._scan(frame, "resolve")
+        scanned, _ = self._scan(frame, "resolve", 0, self._frame_offset(frame))
         kept = []
         for strategy in candidate_strategies(el):
             if isinstance(strategy, CssPath):
@@ -435,7 +436,7 @@ class PlaywrightSurface(Surface):
         for i, strategy in enumerate(target.strategies):
             try:
                 if scanned is None:
-                    scanned, _ = self._scan(frame, "resolve")
+                    scanned, _ = self._scan(frame, "resolve", 0, self._frame_offset(frame))
                 if isinstance(strategy, CssPath):
                     handles = [h["handle"] for h in self._css(frame, strategy.selector)]
                 else:
@@ -546,7 +547,7 @@ class PlaywrightSurface(Surface):
             found: list[tuple[bool, list[ScannedElement], ScannedElement]] = []
             for frame in self._frames():
                 try:
-                    scanned, raw = self._scan(frame, "resolve")
+                    scanned, raw = self._scan(frame, "resolve", 0, self._frame_offset(frame))
                 except PlaywrightError:
                     continue
                 found += [(raw["has_focus"], scanned, e) for e in scanned if e.focused]
@@ -565,7 +566,7 @@ class PlaywrightSurface(Surface):
         frame = self._frame_for(fref)
         if frame is None:
             return f"frame {fref.key} is gone"
-        scanned, _ = self._scan(frame, "resolve")
+        scanned, _ = self._scan(frame, "resolve", 0, self._frame_offset(frame))
         el = next((e for e in scanned if e.handle == handle), None)
         return (scanned, el) if el is not None else "element is gone"
 
@@ -583,8 +584,17 @@ class PlaywrightSurface(Surface):
             f = self._frame_for(frame)
             if f is None:
                 raise ActionFailed("frame_text", frame.key, "frame not found")
-            return f.evaluate(TEXT_JS)
-        return "\n".join(t for f in self._frames() if (t := f.evaluate(TEXT_JS)))
+            try:
+                return f.evaluate(TEXT_JS)
+            except PlaywrightError as exc:  # detached / navigating: a typed surface error
+                raise ActionFailed("frame_text", frame.key, _first_line(exc)) from None
+        texts = []
+        for f in self._frames():
+            try:
+                texts.append(f.evaluate(TEXT_JS))
+            except PlaywrightError:
+                continue  # a frame detached mid-read (e.g. frameset replaced): skip it
+        return "\n".join(t for t in texts if t)
 
     def page_contains(self, text: str, frame: FrameRef | None = None) -> bool:
         return " ".join(text.split()) in self.frame_text(frame)

@@ -434,7 +434,7 @@
       "type": "object"
     },
     "LabelAnchor": {
-      "description": "The control of `role` in the same table row as a cell whose text equals `label`.",
+      "description": "The control of `role` in the same table row as a cell whose text equals `label`.\n\nFor non-interactive roles (cell/text) it selects the VALUE next to the label: an element of\nthat role in the row, other than the label itself. This locates read-only values such as\n\"BRANCH | 001 - MAIN OFFICE\".",
       "properties": {
         "kind": {
           "const": "label_anchor",
@@ -535,6 +535,13 @@
         "message_template": {
           "title": "Message Template",
           "type": "string"
+        },
+        "scope_paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Scope Paths",
+          "type": "array"
         }
       },
       "required": [

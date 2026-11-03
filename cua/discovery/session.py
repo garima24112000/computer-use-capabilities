@@ -1,16 +1,16 @@
 """Wiring for one discovery run: run dir, redactor, event log, transcript, browser, guarded
 surface, recorder and agent. Used by `cua discover` and by the tests (same code path)."""
 
-import os
 from pathlib import Path
 
 from cua.artifact import store
 from cua.artifact.profile import AppProfile
-from cua.discovery.agent import DiscoveryAgent, Escalator
+from cua.discovery.agent import DiscoveryAgent
 from cua.discovery.llm import LLMClient
 from cua.discovery.models import DiscoveryConfig, DiscoveryGoal, DiscoveryResult
 from cua.discovery.recorder import Recorder
 from cua.execute import profile_dialog_policy
+from cua.hitl.escalation import Escalator
 from cua.obs.events import EventLogger
 from cua.obs.evidence import EvidenceCapture
 from cua.obs.run import RunContext
@@ -69,5 +69,4 @@ def run_discovery(
 
 def missing_secrets(profile_name: str = "meridian-core") -> list[str]:
     """Names of profile secrets missing from the environment."""
-    profile = AppProfile.load_named(profile_name)
-    return [s.name for s in profile.secrets if s.name not in os.environ]
+    return AppProfile.load_named(profile_name).missing_secrets()

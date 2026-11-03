@@ -257,6 +257,8 @@ def lint_capability(cap: "Capability", labels: list[str] | None = None) -> LintR
             lin.sensitive_text("sensitive_example", f"inputs.{name}.example", param.example)
     lin.sensitive_text("sensitive_in_provenance", "provenance.goal_redacted",
                        cap.provenance.goal_redacted)
+    _lint_extract_stability(lin, cap)
+    _lint_input_literals(lin, cap)
 
     if cap.status == "approved":
         for i, s in enumerate(cap.steps):
@@ -275,6 +277,44 @@ def lint_capability(cap: "Capability", labels: list[str] | None = None) -> LintR
                      "content changed since approval; replay will refuse irreversible steps "
                      "until re-approved")
     return lin.report
+
+
+def _lint_extract_stability(lin: _Linter, cap: "Capability") -> None:
+    """Every Extract needs a non-structural strategy: a css_path alone breaks on any layout
+    change. Discovered artifacts are rejected for it; hand-written ones get a warning."""
+    for i, step in enumerate(cap.steps):
+        if isinstance(step.action, Extract) and all(
+                isinstance(s, CssPath) for s in step.action.target.strategies):
+            path = f"steps[{i}:{step.id}].action.target"
+            msg = ("extract target has only css_path strategies; it needs a TableCell, "
+                   "LabelAnchor or stable TextMatch (with the output's extract_pattern)")
+            if cap.provenance.source == "discovery":
+                lin.err("extract_structural_only", path, msg)
+            else:
+                lin.warn("extract_structural_only", path, msg)
+
+
+def _lint_input_literals(lin: _Linter, cap: "Capability") -> None:
+    """Free text should say {{inputs.x}}, not the value used during discovery."""
+    values = {p.name: p.example for p in cap.inputs
+              if p.example and not p.sensitive and len(p.example) >= 3}
+    if not values:
+        return
+    texts: list[tuple[str, str]] = [("title", cap.title), ("description", cap.description)]
+    for i, s in enumerate(cap.steps):
+        sp = f"steps[{i}:{s.id}]"
+        texts += [(f"{sp}.intent", s.intent), (f"{sp}.notes", s.notes or "")]
+        if (t := getattr(s.action, "target", None)) is not None:
+            texts.append((f"{sp}.action.target.description", t.description))
+        if s.expect is not None:
+            texts.append((f"{sp}.expect.description", s.expect.description))
+    texts.append(("success.description", cap.success.description))
+    for path, text in texts:
+        for name, value in values.items():
+            if re.search(rf"(?<![\w.]){re.escape(value)}(?![\w])", text):
+                lin.warn("input_literal_in_text", path,
+                         f"contains the discovery value of input {name!r}; "
+                         f"write {{{{inputs.{name}}}}} instead")
 
 
 def lint_profile(profile: "AppProfile") -> LintReport:
