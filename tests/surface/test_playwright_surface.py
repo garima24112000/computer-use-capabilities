@@ -12,8 +12,7 @@ from cua.surface import (
     TargetNotFound,
     TextMatch,
 )
-from tests.surface.conftest import set_faults
-from tests.surface.helpers import MAIN, TOP, goto_inquiry, inquire, open_detail, spec
+from tests.surface.helpers import MAIN, TOP, goto_inquiry, inquire, open_detail, set_faults, spec
 
 SECRET = "SECRET-98765"
 

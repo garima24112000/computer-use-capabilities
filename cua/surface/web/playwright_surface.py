@@ -18,6 +18,7 @@ from playwright.sync_api import (
     Page,
     Playwright,
     Request,
+    Route,
     sync_playwright,
 )
 from playwright.sync_api import Error as PlaywrightError
@@ -38,6 +39,9 @@ from cua.surface.models import (
     ScannedElement,
     StrategyAttempt,
 )
+
+RequestFilter = Callable[[str], bool]  # url -> allowed?
+BlockedCallback = Callable[[str, str], None]  # (url, resource_type)
 
 SCAN_JS = Path(__file__).with_name("dom_scan.js").read_text()
 
@@ -107,6 +111,8 @@ class PlaywrightSurface(Surface):
         dialog_policy_name: str = "custom",
         max_text_elements: int = 300,
         max_frame_text: int = 4000,
+        request_filter: RequestFilter | None = None,
+        on_request_blocked: BlockedCallback | None = None,
     ):
         self.headless = headless
         self.slow_mo = slow_mo
@@ -115,6 +121,10 @@ class PlaywrightSurface(Surface):
         self.quiet_window_ms = quiet_window_ms
         self.viewport = viewport
         self.trace_path = Path(trace_path) if trace_path else None
+        self._tracing = False
+        self._request_filter = request_filter
+        self._on_request_blocked = on_request_blocked
+        self._route_installed = False
         self.user_data_dir = Path(user_data_dir) if user_data_dir else None
         self.dialog_policy = dialog_policy
         self.dialog_policy_name = dialog_policy_name
@@ -150,7 +160,9 @@ class PlaywrightSurface(Surface):
             self._page = self._context.new_page()
         self._context.set_default_timeout(self.default_timeout_ms)
         if self.trace_path:
-            self._context.tracing.start(screenshots=True, snapshots=True)
+            self.start_trace(self.trace_path)
+        if self._request_filter is not None:
+            self._install_route()
         page = self._page
         page.on("dialog", self._on_dialog)
         page.on("request", self._on_request)
@@ -171,6 +183,52 @@ class PlaywrightSurface(Surface):
         assert self._page is not None
         return self._page
 
+    # --- tracing & network filter ---------------------------------------------------------------
+
+    def start_trace(self, path: str | Path) -> None:
+        """Record a Playwright trace.
+
+        Traces hold the UNMASKED DOM and typed values; keep them out of committed evidence.
+        """
+        self.trace_path = Path(path)
+        if not self._tracing:
+            self.context.tracing.start(screenshots=True, snapshots=True)
+            self._tracing = True
+
+    def stop_trace(self) -> Path | None:
+        if not self._tracing or self._context is None or self.trace_path is None:
+            return None
+        self.trace_path.parent.mkdir(parents=True, exist_ok=True)
+        self._context.tracing.stop(path=str(self.trace_path))
+        self._tracing = False
+        return self.trace_path
+
+    def set_request_filter(self, request_filter: RequestFilter,
+                           on_blocked: BlockedCallback | None = None) -> None:
+        """Abort any request (navigation, frame, XHR, asset) the filter rejects."""
+        self._request_filter = request_filter
+        self._on_request_blocked = on_blocked
+        if self._context is not None:
+            self._install_route()
+
+    def _install_route(self) -> None:
+        if not self._route_installed:
+            self.context.route("**/*", self._route)
+            self._route_installed = True
+
+    def _route(self, route: Route) -> None:
+        request = route.request
+        try:
+            allowed = self._request_filter is None or self._request_filter(request.url)
+        except Exception:  # fail closed
+            allowed = False
+        if allowed:
+            route.continue_()
+            return
+        route.abort("blockedbyclient")
+        if self._on_request_blocked is not None:
+            self._on_request_blocked(request.url, request.resource_type)
+
     def open(self, url: str) -> None:
         try:
             self.page.goto(url, wait_until="load")
@@ -180,15 +238,14 @@ class PlaywrightSurface(Surface):
 
     def close(self) -> None:
         if self._context is not None:
-            if self.trace_path:
-                self.trace_path.parent.mkdir(parents=True, exist_ok=True)
-                self._context.tracing.stop(path=str(self.trace_path))
+            self.stop_trace()
             self._context.close()
         if self._browser is not None:
             self._browser.close()
         if self._pw is not None:
             _SharedDriver.release()
         self._pw = self._browser = self._context = self._page = None
+        self._route_installed = False
 
     def __enter__(self) -> "PlaywrightSurface":
         self.start()

@@ -25,6 +25,17 @@ against.
    (replays canned tool calls) exists for tests. Replay must never import the LLM module, and
    running replay must require no cloud credentials.
 
+## Guardrails (built)
+
+- Discovery and replay receive a `cua.policy.guarded_surface.GuardedSurface`, never a raw
+  surface. It enforces `configs/policy.yaml` (allowlist, blocked paths, risk rules, approvals),
+  redacts every observation/read/description, resolves `{{secret:NAME}}` at fill time (only the
+  template is logged), filters all network requests, and auto-masks screenshots.
+- All disk writes go through `cua.obs.events.EventLogger` / `RunContext` / `EvidenceCapture`,
+  which redact first. `tests/obs/test_run_dir_has_no_secrets.py` greps a whole run dir and is the
+  data-handling guarantee: keep it green.
+- Playwright traces (`runs/<id>/trace.zip`) are opt-in and contain UNMASKED DOM. Never commit them.
+
 ## Conventions
 
 - Python 3.11, managed with `uv`. Use the Playwright **sync** API everywhere.

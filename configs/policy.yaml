@@ -1,0 +1,89 @@
+# Guardrail policy for Meridian Core (target_app). Loaded by cua.policy.models.PolicyConfig.
+version: 1
+
+# Origins the browser may talk to. Port is wildcarded because tests use free ports.
+allowed_origins:
+  - "http://localhost:*"
+  - "http://127.0.0.1:*"
+
+# Paths (URL path only, query ignored) the agent may load, including frames and assets.
+allowed_paths:
+  - "/login"
+  - "/logout"
+  - "/"
+  - "/top"
+  - "/nav"
+  - "/welcome"
+  - "/inquiry*"
+  - "/member/*"
+  - "/subacct/*"
+  - "/img/*"          # e.g. the SUBMIT image button on the review page
+  - "/favicon.ico"    # requested automatically by the browser
+
+# Blocked beats allowed: the fault-injection control plane is never reachable by the agent.
+blocked_paths:
+  - "/__faults*"
+
+allowed_actions: [click, fill, select, press, read, navigate]
+
+# Ordered; first match wins. All match fields are optional and ANDed together.
+# action/role accept a single value or a list. name_regex uses re.search on the element's
+# accessible name. url_glob is matched against the URL path of the frame holding the element
+# (or the navigation target for action=navigate).
+risk_rules:
+  - id: subacct-submit
+    match: {action: click, name_regex: "(?i)^submit$", url_glob: "/subacct/review*"}
+    risk: irreversible
+    reason: commits a new sub-account
+  - id: sign-off
+    match: {action: click, name_regex: "(?i)\\b(sign ?off|sign ?out|log ?out|log ?off)\\b"}
+    risk: risky
+    reason: ends the session
+  - id: logout-navigation
+    match: {action: navigate, url_glob: "/logout*"}
+    risk: risky
+    reason: ends the session
+  - id: generic-commit-verb
+    match:
+      action: click
+      name_regex: "(?i)\\b(submit|confirm|approve|transfer|post|delete|close account|wire)\\b"
+    risk: irreversible
+    reason: conservative default for anything that sounds like a commit
+
+# Used when no risk rule matches. Clicks default to risky: a click can change state unless a
+# rule proves otherwise. Everything else defaults to safe.
+default_risk:
+  fill: safe
+  select: safe
+  read: safe
+  press: safe
+  navigate: safe
+  click: risky
+
+mode_rules:
+  discovery:
+    safe: allow
+    risky: allow
+    irreversible: require_approval
+  replay:
+    safe: allow
+    risky: allow
+    irreversible:
+      verdict: allow
+      requires: [artifact_approved, step_approved]
+      otherwise: require_approval
+
+# Case-insensitive, matched as whole words against row labels / column headers / field labels.
+sensitive_labels:
+  - SSN
+  - SOCIAL SECURITY
+  - ADDRESS
+  - PHONE
+  - EMAIL
+  - DOB
+  - DATE OF BIRTH
+  - ACCOUNT NUMBER
+  - PASSWORD
+  - OPERATOR PASSWORD
+  - MEMBER NAME
+  - NAME
