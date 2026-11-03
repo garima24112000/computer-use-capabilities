@@ -43,6 +43,7 @@ curl -X POST localhost:8001/__faults/reset
 ```bash
 uv run pytest                          # unit/behavior tests (FastAPI TestClient)
 uv run python scripts/smoke_target.py  # real headless browser drives the app end to end
+uv run python scripts/observe.py       # print the Observation an LLM would see (member 12345)
 uv run ruff check .
 ```
 
