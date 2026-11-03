@@ -14,6 +14,7 @@ EventType = Literal[
     "run_started", "observation", "llm_decision", "action", "policy_decision", "network_blocked",
     "approval_requested", "approval_result", "dialog", "recovery", "checkpoint", "outcome",
     "escalation", "human_action", "error", "run_finished",
+    "checkpoint_generated", "dropped_step", "warning",
 ]
 Actor = Literal["agent", "replay", "human", "system"]
 

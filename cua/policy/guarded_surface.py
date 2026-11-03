@@ -105,6 +105,9 @@ class GuardedSurface(Surface):
         self.secrets = secrets or SecretResolver(self.redactor)
         self.labels = guard.config.sensitive_labels
         self._elements: dict[str, ElementInfo] = {}
+        # Decision for the most recent action that passed authorization and was dispatched to
+        # the inner surface (even if it then failed): lets callers tell "maybe executed" apart.
+        self.last_dispatched: PolicyDecision | None = None
         if hasattr(inner, "set_request_filter"):
             inner.set_request_filter(lambda url: guard.url_decision(url) is None,
                                      self._on_network_blocked)
@@ -221,6 +224,7 @@ class GuardedSurface(Surface):
         summary = self._summary(action, info, target)
         decision = (decide or self._decide)(action, info, ctx)
         self._authorize(decision, summary, ctx)
+        self.last_dispatched = decision
         try:
             result = run(info)
         except SurfaceError as exc:

@@ -103,7 +103,9 @@ class Redactor:
     # --- layer 1 --------------------------------------------------------------------------------
 
     def register_secret(self, value: str, kind: str = "SECRET") -> None:
-        self._register(value, kind)
+        """Secrets are also scrubbed in upper/lower case: UIs echo ids re-cased (DEMO_OPERATOR)."""
+        for variant in {value, value.upper(), value.lower()}:
+            self._register(variant, kind)
 
     def register_sensitive(self, value: str, kind: str) -> None:
         self._register(value, kind)

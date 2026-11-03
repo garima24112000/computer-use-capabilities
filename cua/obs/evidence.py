@@ -27,9 +27,9 @@ class EvidenceCapture:
         self.actor = actor
         self._n = 0
 
-    def _screenshot(self, label: str) -> Path:
+    def _screenshot(self, label: str, filename: str | None = None) -> Path:
         self._n += 1
-        path = self.run.screenshots_dir / f"{self._n:03d}-{_slug(label)}.png"
+        path = self.run.screenshots_dir / (filename or f"{self._n:03d}-{_slug(label)}.png")
         if getattr(self.surface, "masks_sensitive", False):
             self.surface.screenshot(path)  # GuardedSurface masks by itself
         else:
@@ -38,8 +38,9 @@ class EvidenceCapture:
             self.surface.screenshot(path, fail_closed_masks(self.surface, masks))
         return path
 
-    def capture_step(self, step_label: str, step_id: str | None = None) -> Path:
-        path = self._screenshot(step_label)
+    def capture_step(self, step_label: str, step_id: str | None = None,
+                     filename: str | None = None) -> Path:
+        path = self._screenshot(step_label, filename)
         if self.logger:
             self.logger.emit("checkpoint", self.actor, step_id, label=step_label,
                              screenshot=self.run.rel(path))

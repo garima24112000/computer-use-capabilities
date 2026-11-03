@@ -48,6 +48,16 @@ against.
 - `sensitive_labels` live in the app profile only; `configs/policy.yaml` references them.
 - `tests/fixtures/capabilities/` are hand-written fixtures, not discovery output.
 
+## Discovery (built)
+
+- `cua/discovery/`: `llm.py` (LLMClient, Bedrock, Scripted; the ONLY boto3 import), `tools.py`
+  (action space + validation), `prompts.py` (PROMPT_VERSION), `agent.py` (loop, stop rules,
+  Escalator seam), `recorder.py` (run → draft Capability), `session.py` (wiring).
+- `cua/execute.py` runs artifact actions/checkpoints deterministically (login subflow,
+  interstitial recovery). Shared with replay; it must never import `cua.discovery`.
+- The model sees only redacted text (system prompt, observations, tool results) and never sees
+  credentials. Tests use ScriptedLLMClient only; never call Bedrock from tests.
+
 ## Conventions
 
 - Python 3.11, managed with `uv`. Use the Playwright **sync** API everywhere.

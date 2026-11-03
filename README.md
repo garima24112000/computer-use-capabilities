@@ -5,8 +5,8 @@ typed, versioned capability artifact, and that artifact is replayed deterministi
 in the loop. The project also includes human-in-the-loop handoff and safety guardrails. See
 [CLAUDE.md](CLAUDE.md) for the project rules.
 
-> Status: target app, surface layer, guardrails and the capability artifact schema are built. The
-> LLM discovery loop, replay engine and HITL console come in later steps.
+> Status: target app, surface layer, guardrails, the capability artifact schema and LLM discovery
+> are built. The replay engine and HITL console come in later steps.
 
 ## Install
 
@@ -46,6 +46,24 @@ uv run python scripts/smoke_target.py  # real headless browser drives the app en
 uv run python scripts/observe.py       # print the Observation an LLM would see (member 12345)
 uv run ruff check .
 ```
+
+## Discover a capability (LLM)
+
+Needs AWS credentials in the `AWS_PROFILE` profile and `BEDROCK_MODEL_ID` in `.env`. The target
+app starts in the background automatically; the agent signs on with the profile's secrets, which
+it never sees.
+
+```bash
+uv run cua discover \
+  --goal "Look up member 12345 and read their Share Savings balance" \
+  --id meridian.member.read_savings_balance --title "Read a member's share savings balance" \
+  --input 'member_id=12345:string:^\d{5}$' --output savings_balance:money:money_to_decimal
+# offline / no AWS: --llm scripted:<file.json>   (canned tool calls, see tests/discovery)
+```
+
+Each run writes `runs/<run_id>/` (events, redacted transcript, masked step screenshots,
+summary.json) and a **draft** artifact in `capabilities/<id>/<version>.json`. Irreversible
+actions ask for approval at the terminal (`--approve-mode deny` refuses them).
 
 ## Capability artifacts
 

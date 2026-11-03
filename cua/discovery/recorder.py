@@ -1,0 +1,358 @@
+"""Recorder: turns the successful actions of a discovery run into a draft Capability.
+
+Everything it stores comes from PII-safe sources: GuardedSurface.describe() (sensitive
+strategies already dropped), redacted observations and the agent's templated values. Before
+saving, the whole artifact is checked against the run's Redactor. Any value the run learned was
+sensitive (e.g. a member name) rejects the artifact, even if the pattern-based lint would not
+notice.
+"""
+
+import json
+import re
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlsplit
+
+from pydantic import BaseModel, ValidationError
+
+from cua import __version__
+from cua.artifact import store
+from cua.artifact.conditions import Checkpoint, Condition, TargetPresent, TextPresent, UrlMatches
+from cua.artifact.contract import InputParam, OutputField
+from cua.artifact.profile import AppProfile
+from cua.artifact.schema import Capability, Provenance
+from cua.artifact.steps import Click, Extract, Fill, Press, Select, Step
+from cua.discovery.models import DiscoveryGoal
+from cua.discovery.prompts import PROMPT_VERSION
+from cua.discovery.tools import ValidatedCall
+from cua.execute import check_condition
+from cua.obs.events import EventLogger
+from cua.obs.run import RunContext
+from cua.policy.models import PolicyDecision
+from cua.policy.redaction import Redactor
+from cua.surface.base import Surface
+from cua.surface.errors import SurfaceError, TargetNotFound
+from cua.surface.locators import CssPath, TableCell, TargetSpec, TextMatch
+from cua.surface.models import ElementInfo, Observation
+from cua.templating import placeholders
+
+RECORDER_VERSION = f"recorder-v1+{PROMPT_VERSION}"
+_ID_LIKE = re.compile(r"^(\d+|[0-9a-fA-F]{8,}|[0-9a-fA-F-]{32,})$")
+_UNSTABLE = re.compile(r"\d{3,}")
+
+
+class PendingStep(BaseModel):
+    verb: str
+    slug: str
+    step: dict[str, Any]  # Step fields without `id` (assigned at build time)
+
+
+def _slug(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")[:30] or "element"
+
+
+def _paths(obs: Observation) -> dict[str, str]:
+    return {f.frame.key: urlsplit(f.url).path for f in obs.frames}
+
+
+def _headers(obs: Observation, frame_key: str) -> list[str]:
+    seen: list[str] = []
+    for el in obs.elements:
+        tc = el.table_context
+        if el.frame.key == frame_key and tc and tc.table_caption_or_header \
+                and tc.table_caption_or_header not in seen:
+            seen.append(tc.table_caption_or_header)
+    return seen
+
+
+class Recorder:
+    def __init__(self, goal: DiscoveryGoal, profile: AppProfile, surface: Surface,
+                 redactor: Redactor, logger: EventLogger, run: RunContext,
+                 capabilities_root: Path = store.CAPABILITIES_DIR):
+        self.goal = goal
+        self.profile = profile
+        self.surface = surface
+        self.redactor = redactor
+        self.log = logger
+        self.run = run
+        self.capabilities_root = Path(capabilities_root)
+        self.inputs = goal.input_values()
+        self.public_inputs = {i.name: str(i.value) for i in goal.inputs
+                              if not i.sensitive and str(i.value).strip()}
+        self.steps: list[PendingStep] = []
+        self.visited: set[tuple[str, str]] = set()  # (frame key, path)
+        self.success: Checkpoint | None = None
+
+    # --- helpers --------------------------------------------------------------------------------
+
+    def _warn(self, code: str, **data: Any) -> None:
+        self.log.emit("warning", "agent", code=code, **data)
+
+    def _templated(self, text: str) -> str:
+        """Replace non-sensitive input literals in `text` with their {{inputs.x}} templates."""
+        for name, value in sorted(self.public_inputs.items(), key=lambda kv: -len(kv[1])):
+            text = text.replace(value, f"{{{{inputs.{name}}}}}")
+        return text
+
+    def _same_element(self, target: TargetSpec, el: ElementInfo) -> bool:
+        try:
+            handle, _ = self.surface.resolve(target.bind(self.inputs))
+        except (TargetNotFound, ValueError):
+            return False
+        found = handle.element
+        return found is not None and found.role == el.role and found.bbox == el.bbox
+
+    def observe_pages(self, obs: Observation) -> None:
+        self.visited |= set(_paths(obs).items())
+
+    # --- targets --------------------------------------------------------------------------------
+
+    def target_for(self, ref: str, el: ElementInfo, extract_text: str | None = None
+                   ) -> TargetSpec:
+        """Durable, PII-safe TargetSpec for `ref` (call BEFORE acting: the ref must be live)."""
+        spec = self.surface.describe(ref)
+        strategies = list(spec.strategies)
+        # (c) structural position keyed by a declared non-sensitive input.
+        for i, s in enumerate(strategies):
+            if isinstance(s, TableCell):
+                name = next((n for n, v in self.public_inputs.items() if v == s.row_key), None)
+                if name:
+                    strategies[i] = s.model_copy(update={"row_key": f"{{{{inputs.{name}}}}}"})
+        tc = el.table_context
+        if tc and tc.column_header and not any(
+                isinstance(s, TableCell) and s.row_key_input for s in strategies):
+            for name in self.public_inputs:
+                cand = TableCell(section_header=tc.table_caption_or_header,
+                                 row_key=f"{{{{inputs.{name}}}}}", column_header=tc.column_header)
+                probe = TargetSpec(frame=spec.frame, strategies=[cand], description="probe")
+                if self._same_element(probe, el):
+                    at = next((k for k, s in enumerate(strategies) if isinstance(s, CssPath)),
+                              len(strategies))
+                    strategies.insert(at, cand)
+                    break
+        # Strategies keyed on this run's input value (e.g. LabelAnchor(label="12345")) would
+        # only match for this value; keep them only where they could be parameterized above.
+        values = set(self.inputs.values())
+        strategies = [s for s in strategies if isinstance(s, TableCell) or not any(
+            isinstance(v, str) and v in values for v in s.model_dump().values())]
+        description = self._templated(spec.description)
+        if extract_text:
+            strategies = self._stable_for_extract(strategies, spec, el, extract_text)
+            description = description.replace(" ".join(extract_text.split()), "<value>")
+        if not strategies:
+            raise SurfaceError("no PII-safe, stable strategy identifies this element")
+        return spec.model_copy(update={"strategies": strategies, "description": description})
+
+    def _stable_for_extract(self, strategies: list, spec: TargetSpec, el: ElementInfo,
+                            raw: str) -> list:
+        """Drop strategies that embed the value being read (it changes per run); add a
+        text-prefix match when the label part of the text is stable."""
+        raw_n = " ".join(raw.split())
+        kept = [s for s in strategies
+                if raw_n not in json.dumps(s.model_dump(), ensure_ascii=False)]
+        m = re.search(r"\d", raw_n)
+        prefix = raw_n[:m.start()].strip() if m else ""
+        if len(prefix) >= 8:
+            cand = TextMatch(text=prefix, role=el.role, exact=False)
+            probe = TargetSpec(frame=spec.frame, strategies=[cand], description="probe")
+            if self._same_element(probe, el):
+                at = next((k for k, s in enumerate(kept) if isinstance(s, CssPath)), len(kept))
+                kept.insert(at, cand)
+        return kept
+
+    # --- recording ------------------------------------------------------------------------------
+
+    def _value(self, call: ValidatedCall) -> str:
+        value = call.value or ""
+        if placeholders(value):
+            return value
+        name = next((n for n, v in self.inputs.items() if v == value and value), None)
+        if name is not None:
+            self._warn("parameterized_literal", input=name, tool=call.name)
+            return f"{{{{inputs.{name}}}}}"
+        if value:
+            self._warn("literal_value_needs_review", tool=call.name, value=value)
+        return value
+
+    def record_action(self, call: ValidatedCall, target: TargetSpec, el: ElementInfo,
+                      decision: PolicyDecision, pre: Observation, post: Observation,
+                      changed: bool) -> None:
+        if call.name in ("click", "press") and not changed:
+            self.log.emit("dropped_step", "agent", tool=call.name, target=target.description,
+                          reason="page unchanged and nothing was filled or extracted")
+            return
+        notes = None
+        if call.name == "click":
+            action: Any = Click(target=target)
+        elif call.name == "press":
+            action = Press(key=call.key or "Enter", target=target)
+        else:
+            value = self._value(call)
+            if not placeholders(value) and value:
+                notes = "REVIEW: literal value recorded as-is (not a declared input)"
+            action = Fill(target=target, value=value) if call.name == "fill" \
+                else Select(target=target, option=value)
+        risk = decision.risk
+        step = Step(id="pending", intent=self._templated(call.intent), action=action, risk=risk,
+                    requires_approval=risk == "irreversible", approved=False,
+                    expect=self._expect(pre, post), notes=notes)
+        name = el.name if not el.name.startswith("[REDACTED") else (
+            (el.table_context.column_header if el.table_context else None) or el.role)
+        self.steps.append(PendingStep(
+            verb=call.name, slug=_slug(name),
+            step=step.model_dump(mode="json", exclude_none=True, exclude={"id"})))
+
+    def record_extract(self, call: ValidatedCall, target: TargetSpec, el: ElementInfo) -> None:
+        # Re-extracting an output replaces the earlier Extract (exactly one per output).
+        self.steps = [p for p in self.steps
+                      if not (p.verb == "extract"
+                              and p.step["action"].get("output") == call.output)]
+        step = Step(id="pending", intent=self._templated(call.intent),
+                    action=Extract(target=target, output=call.output or ""), risk="safe")
+        self.steps.append(PendingStep(verb="extract", slug=_slug(call.output or "value"),
+                                      step=step.model_dump(mode="json", exclude_none=True,
+                                                           exclude={"id"})))
+
+    # --- checkpoints ----------------------------------------------------------------------------
+
+    def _validated(self, conds: list[Condition]) -> list[Condition]:
+        kept = []
+        for c in conds:
+            res = check_condition(self.surface, c, self.inputs)
+            self.log.emit("checkpoint_generated", "agent", condition=res.condition, kept=res.ok,
+                          observed=res.observed)
+            if res.ok:
+                kept.append(c)
+        return kept
+
+    def _expect(self, pre: Observation, post: Observation) -> Checkpoint | None:
+        before, after = _paths(pre), _paths(post)
+        changed = [k for k, p in after.items() if before.get(k) != p]
+        if "_top" in changed:
+            changed = ["_top"]
+        conds: list[Condition] = []
+        frames = {f.frame.key: f.frame for f in post.frames}
+        for key in changed:
+            segs = [("*" if _ID_LIKE.match(s) or s in self.inputs.values() else s)
+                    for s in after[key].split("/")]
+            frame = None if key == "_top" else frames[key]
+            conds.append(UrlMatches(frame=frame, path_glob="/".join(segs) or "/"))
+        for key in changed or [k for k in after if k != "_top"]:
+            old = set(_headers(pre, key))
+            for header in _headers(post, key):
+                text = self._templated(header)
+                if header in old or "[REDACTED" in header or _UNSTABLE.search(text) \
+                        or self.redactor.redact_text(header) != header:
+                    continue
+                conds.append(TextPresent(frame=frames.get(key), text=text))
+                break
+        conds = self._validated(conds)
+        return Checkpoint(description="postcondition recorded during discovery",
+                          all_of=conds) if conds else None
+
+    def finalize_success(self) -> None:
+        """Success = the last navigation's expectations + every Extract target present.
+        Validated against the live (final) page; call while it is still showing."""
+        conds: list[Condition] = []
+        for p in reversed(self.steps):
+            exp = p.step.get("expect")
+            if exp and any(c["kind"] == "url_matches" for c in exp["all_of"]):
+                conds += Checkpoint.model_validate(exp).all_of
+                break
+        for p in self.steps:
+            if p.verb == "extract":
+                conds.append(TargetPresent(target=TargetSpec.model_validate(
+                    p.step["action"]["target"])))
+        conds = self._validated(conds)
+        self.success = Checkpoint(description="final page shows the extracted values",
+                                  all_of=conds) if conds else None
+
+    # --- build ----------------------------------------------------------------------------------
+
+    def _next_version(self) -> str:
+        folder = self.capabilities_root / self.goal.capability_id
+        versions = []
+        for p in folder.glob("*.json") if folder.exists() else []:
+            if ".rejected" not in p.name and re.fullmatch(r"\d+\.\d+\.\d+", p.stem):
+                versions.append(tuple(int(x) for x in p.stem.split(".")))
+        if not versions:
+            return "1.0.0"
+        major, minor, _ = max(versions)
+        return f"{major}.{minor + 1}.0"
+
+    def _contract(self) -> tuple[list[InputParam], list[OutputField]]:
+        return self.goal.contract()  # validated before the run started; cannot drift
+
+    def _outcomes(self) -> list[str]:
+        visited_frames = {k for k, _ in self.visited}
+        out = []
+        for o in self.profile.outcomes:
+            ok = True
+            for _, c in o.detect.conditions():
+                frame = getattr(c, "frame", None)
+                if frame is not None and frame.key not in visited_frames:
+                    ok = False
+                if isinstance(c, UrlMatches) and not any(
+                        re.fullmatch(c.path_glob.replace("*", ".*"), p) for _, p in self.visited):
+                    ok = False
+            if ok:
+                out.append(o.id)
+        return out or [o.id for o in self.profile.outcomes]
+
+    def build(self, model_id: str, transcript_sha256: str | None
+              ) -> tuple[Path | None, Path | None, list[str], Capability | None]:
+        """Lint + save. Returns (artifact path, rejected path, lint errors, capability)."""
+        version = self._next_version()
+        inputs, outputs = self._contract()
+        steps = []
+        for n, p in enumerate(self.steps, 1):
+            steps.append({**p.step, "id": f"s{n:02d}_{p.verb}_{p.slug}"})
+        data = {
+            "schema_version": "1.0", "id": self.goal.capability_id, "version": version,
+            "title": self.goal.title, "description": self.redactor.redact_text(self.goal.goal),
+            "status": "draft",
+            "app": {"product": self.profile.product,
+                    "product_versions": self.profile.product_versions,
+                    "profile": self.profile.id, "surface": self.profile.surface},
+            "inputs": [i.model_dump(mode="json", exclude_none=True) for i in inputs],
+            "outputs": [o.model_dump(mode="json", exclude_none=True) for o in outputs],
+            "use_profile_outcomes": self._outcomes(),
+            "steps": steps,
+            "success": self.success.model_dump(mode="json", exclude_none=True)
+            if self.success else None,
+            "provenance": Provenance(
+                source="discovery", recorded_from_run_id=self.run.run_id,
+                recorded_at=self.run.manifest.started_at, model_id=model_id,
+                goal_redacted=self.redactor.redact_text(self.goal.goal),
+                transcript_sha256=transcript_sha256, evidence_dir=str(self.run.dir),
+                recorder_version=f"{RECORDER_VERSION} (cua {__version__})",
+                git_commit=self.run.manifest.git_commit,
+            ).model_dump(mode="json", exclude_none=True),
+        }
+        # Example values of inputs are kept only if the run redactor considers them safe.
+        errors: list[str] = []
+        # Hashes are excluded: a random hex digest can contain a 9+ digit run that the
+        # ACCOUNT_NUMBER pattern would (harmlessly) match.
+        checked = {**data, "provenance": {k: v for k, v in data["provenance"].items()
+                                          if k not in ("transcript_sha256", "git_commit")}}
+        if self.redactor.redact(checked) != checked:
+            errors.append("[run_redactor] artifact contains values this run learned are "
+                          "sensitive")
+        if data["success"] is None:
+            errors.append("[no_success_checkpoint] no verifiable success condition was found")
+        cap = None
+        if not errors:
+            try:
+                cap = Capability.model_validate(
+                    data, context={"sensitive_labels": self.profile.sensitive_labels})
+            except ValidationError as exc:
+                errors += [str(e.get("msg", e)) for e in exc.errors()]
+        if cap is not None:
+            path = store.save(cap, root=self.capabilities_root)
+            return path, None, [], cap
+        rejected = self.capabilities_root / self.goal.capability_id / f"{version}.rejected.json"
+        rejected.parent.mkdir(parents=True, exist_ok=True)
+        payload = self.redactor.redact({"capability": data, "lint_errors": errors})
+        rejected.write_text(store.canonical_json(json.loads(json.dumps(payload, default=str))),
+                            encoding="utf-8")
+        return None, rejected, errors, None

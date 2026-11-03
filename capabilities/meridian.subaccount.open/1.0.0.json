@@ -1,0 +1,671 @@
+{
+  "app": {
+    "product": "meridian-core",
+    "product_versions": ">=4.2,<5",
+    "profile": "meridian-core",
+    "surface": "web"
+  },
+  "description": "Open a new Money Market sub-account for member 22222 with an initial deposit of 250.00 and nickname Rainy Day, and reach the confirmation screen",
+  "id": "meridian.subaccount.open",
+  "inputs": [
+    {
+      "description": "member id",
+      "example": "22222",
+      "name": "member_id",
+      "pattern": "^\\d{5}$",
+      "required": true,
+      "sensitive": false,
+      "type": "string"
+    },
+    {
+      "description": "account type",
+      "enum_values": [
+        "Share Savings",
+        "Money Market",
+        "Certificate 12mo"
+      ],
+      "example": "Money Market",
+      "name": "account_type",
+      "required": true,
+      "sensitive": false,
+      "type": "enum"
+    },
+    {
+      "description": "initial deposit",
+      "example": "250.00",
+      "name": "initial_deposit",
+      "required": true,
+      "sensitive": false,
+      "type": "decimal"
+    },
+    {
+      "description": "nickname",
+      "example": "Rainy Day",
+      "name": "nickname",
+      "required": true,
+      "sensitive": false,
+      "type": "string"
+    }
+  ],
+  "outcomes": [],
+  "outputs": [
+    {
+      "description": "confirmation number",
+      "name": "confirmation_number",
+      "normalize": "none",
+      "nullable": false,
+      "sensitive": false,
+      "type": "string"
+    }
+  ],
+  "preconditions": {
+    "entry_path": "/login",
+    "session": "login_subflow"
+  },
+  "provenance": {
+    "evidence_dir": "runs/20261103T174137Z-7b68e0",
+    "git_commit": "24f5e6ea24dd143f1b45a4e5c835183f3ff699bc",
+    "goal_redacted": "Open a new Money Market sub-account for member 22222 with an initial deposit of 250.00 and nickname Rainy Day, and reach the confirmation screen",
+    "model_id": "us.anthropic.claude-sonnet-4-6",
+    "recorded_at": "2026-11-03T17:41:37.984019Z",
+    "recorded_from_run_id": "20261103T174137Z-7b68e0",
+    "recorder_version": "recorder-v1+discovery-v1 (cua 0.1.0)",
+    "source": "discovery",
+    "transcript_sha256": "93e6a90e8919b4401c79ced76ed5604a51e0d356da51a3d7c4a184e08f619b13"
+  },
+  "review": {},
+  "schema_version": "1.0",
+  "secrets": [],
+  "status": "draft",
+  "steps": [
+    {
+      "action": {
+        "target": {
+          "description": "link \"OPEN SUB-ACCOUNT\" in section FUNCTIONS [frame nav]",
+          "fingerprint": {
+            "bbox": {
+              "height": 13.0,
+              "width": 141.078125,
+              "x": 8.0,
+              "y": 122.0
+            },
+            "name": "OPEN SUB-ACCOUNT",
+            "role": "link",
+            "tag": "a"
+          },
+          "frame": {
+            "name_path": [
+              "nav"
+            ],
+            "url_path_pattern": "/nav"
+          },
+          "strategies": [
+            {
+              "exact": true,
+              "kind": "role_name",
+              "name": "OPEN SUB-ACCOUNT",
+              "role": "link"
+            },
+            {
+              "exact": true,
+              "kind": "text_match",
+              "text": "OPEN SUB-ACCOUNT"
+            },
+            {
+              "brittle": true,
+              "kind": "css_path",
+              "selector": "html > body:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(1) > a:nth-of-type(1)"
+            }
+          ]
+        },
+        "type": "click"
+      },
+      "approved": false,
+      "expect": {
+        "all_of": [
+          {
+            "frame": {
+              "name_path": [
+                "main"
+              ],
+              "url_path_pattern": "/subacct/open"
+            },
+            "kind": "url_matches",
+            "path_glob": "/subacct/open"
+          },
+          {
+            "exact": false,
+            "frame": {
+              "name_path": [
+                "main"
+              ],
+              "url_path_pattern": "/subacct/open"
+            },
+            "kind": "text_present",
+            "text": "OPEN SUB-ACCOUNT"
+          }
+        ],
+        "description": "postcondition recorded during discovery",
+        "timeout_ms": 5000
+      },
+      "id": "s01_click_open_sub_account",
+      "intent": "Navigate to the Open Sub-Account screen to begin creating a new {{inputs.account_type}} sub-account.",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "risky",
+      "settle_timeout_ms": 15000
+    },
+    {
+      "action": {
+        "target": {
+          "description": "textbox \"MEMBER NO.\" in section OPEN SUB-ACCOUNT [frame main]",
+          "fingerprint": {
+            "bbox": {
+              "height": 18.0,
+              "width": 67.0,
+              "x": 367.296875,
+              "y": 96.5
+            },
+            "name": "MEMBER NO.",
+            "role": "textbox",
+            "tag": "input"
+          },
+          "frame": {
+            "name_path": [
+              "main"
+            ],
+            "url_path_pattern": "/subacct/open"
+          },
+          "strategies": [
+            {
+              "exact": true,
+              "kind": "role_name",
+              "name": "MEMBER NO.",
+              "role": "textbox"
+            },
+            {
+              "kind": "label_anchor",
+              "label": "MEMBER NO.",
+              "role": "textbox"
+            },
+            {
+              "brittle": true,
+              "kind": "css_path",
+              "selector": "html > body:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(2) > input:nth-of-type(1)"
+            }
+          ]
+        },
+        "type": "fill",
+        "value": "{{inputs.member_id}}"
+      },
+      "approved": false,
+      "id": "s02_fill_member_no",
+      "intent": "Enter the member ID to identify the account holder.",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "safe",
+      "settle_timeout_ms": 15000
+    },
+    {
+      "action": {
+        "option": "{{inputs.account_type}}",
+        "target": {
+          "description": "combobox \"ACCOUNT TYPE\" in section OPEN SUB-ACCOUNT [frame main]",
+          "fingerprint": {
+            "bbox": {
+              "height": 16.0,
+              "width": 103.0,
+              "x": 367.296875,
+              "y": 122.5
+            },
+            "name": "ACCOUNT TYPE",
+            "role": "combobox",
+            "tag": "select"
+          },
+          "frame": {
+            "name_path": [
+              "main"
+            ],
+            "url_path_pattern": "/subacct/open"
+          },
+          "strategies": [
+            {
+              "exact": true,
+              "kind": "role_name",
+              "name": "ACCOUNT TYPE",
+              "role": "combobox"
+            },
+            {
+              "kind": "label_anchor",
+              "label": "ACCOUNT TYPE",
+              "role": "combobox"
+            },
+            {
+              "brittle": true,
+              "kind": "css_path",
+              "selector": "html > body:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(2) > select:nth-of-type(1)"
+            }
+          ]
+        },
+        "type": "select"
+      },
+      "approved": false,
+      "id": "s03_select_account_type",
+      "intent": "Select {{inputs.account_type}} as the account type for the new sub-account.",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "safe",
+      "settle_timeout_ms": 15000
+    },
+    {
+      "action": {
+        "target": {
+          "description": "textbox \"INITIAL DEPOSIT\" in section OPEN SUB-ACCOUNT [frame main]",
+          "fingerprint": {
+            "bbox": {
+              "height": 18.0,
+              "width": 96.0,
+              "x": 367.296875,
+              "y": 146.5
+            },
+            "name": "INITIAL DEPOSIT",
+            "role": "textbox",
+            "tag": "input"
+          },
+          "frame": {
+            "name_path": [
+              "main"
+            ],
+            "url_path_pattern": "/subacct/open"
+          },
+          "strategies": [
+            {
+              "exact": true,
+              "kind": "role_name",
+              "name": "INITIAL DEPOSIT",
+              "role": "textbox"
+            },
+            {
+              "kind": "label_anchor",
+              "label": "INITIAL DEPOSIT",
+              "role": "textbox"
+            },
+            {
+              "brittle": true,
+              "kind": "css_path",
+              "selector": "html > body:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(2) > input:nth-of-type(1)"
+            }
+          ]
+        },
+        "type": "fill",
+        "value": "{{inputs.initial_deposit}}"
+      },
+      "approved": false,
+      "id": "s04_fill_initial_deposit",
+      "intent": "Enter the initial deposit amount for the new {{inputs.account_type}} sub-account.",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "safe",
+      "settle_timeout_ms": 15000
+    },
+    {
+      "action": {
+        "target": {
+          "description": "textbox \"NICKNAME\" in section OPEN SUB-ACCOUNT [frame main]",
+          "fingerprint": {
+            "bbox": {
+              "height": 18.0,
+              "width": 153.0,
+              "x": 367.296875,
+              "y": 171.5
+            },
+            "name": "NICKNAME",
+            "role": "textbox",
+            "tag": "input"
+          },
+          "frame": {
+            "name_path": [
+              "main"
+            ],
+            "url_path_pattern": "/subacct/open"
+          },
+          "strategies": [
+            {
+              "exact": true,
+              "kind": "role_name",
+              "name": "NICKNAME",
+              "role": "textbox"
+            },
+            {
+              "kind": "label_anchor",
+              "label": "NICKNAME",
+              "role": "textbox"
+            },
+            {
+              "brittle": true,
+              "kind": "css_path",
+              "selector": "html > body:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(4) > td:nth-of-type(2) > input:nth-of-type(1)"
+            }
+          ]
+        },
+        "type": "fill",
+        "value": "{{inputs.nickname}}"
+      },
+      "approved": false,
+      "id": "s05_fill_nickname",
+      "intent": "Enter the nickname '{{inputs.nickname}}' for the new {{inputs.account_type}} sub-account.",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "safe",
+      "settle_timeout_ms": 15000
+    },
+    {
+      "action": {
+        "target": {
+          "description": "button \"CONTINUE\" in section OPEN SUB-ACCOUNT [frame main]",
+          "fingerprint": {
+            "bbox": {
+              "height": 21.0,
+              "width": 89.890625,
+              "x": 367.296875,
+              "y": 196.0
+            },
+            "name": "CONTINUE",
+            "role": "button",
+            "tag": "td"
+          },
+          "frame": {
+            "name_path": [
+              "main"
+            ],
+            "url_path_pattern": "/subacct/open"
+          },
+          "strategies": [
+            {
+              "exact": true,
+              "kind": "role_name",
+              "name": "CONTINUE",
+              "role": "button"
+            },
+            {
+              "exact": true,
+              "kind": "text_match",
+              "text": "CONTINUE"
+            },
+            {
+              "brittle": true,
+              "kind": "css_path",
+              "selector": "html > body:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(5) > td:nth-of-type(2) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1)"
+            }
+          ]
+        },
+        "type": "click"
+      },
+      "approved": false,
+      "expect": {
+        "all_of": [
+          {
+            "frame": {
+              "name_path": [
+                "main"
+              ],
+              "url_path_pattern": "/subacct/review"
+            },
+            "kind": "url_matches",
+            "path_glob": "/subacct/review"
+          },
+          {
+            "exact": false,
+            "frame": {
+              "name_path": [
+                "main"
+              ],
+              "url_path_pattern": "/subacct/review"
+            },
+            "kind": "text_present",
+            "text": "OPEN SUB-ACCOUNT - REVIEW"
+          }
+        ],
+        "description": "postcondition recorded during discovery",
+        "timeout_ms": 5000
+      },
+      "id": "s06_click_continue",
+      "intent": "Submit the form to proceed to the confirmation screen for the new {{inputs.account_type}} sub-account.",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "risky",
+      "settle_timeout_ms": 15000
+    },
+    {
+      "action": {
+        "target": {
+          "description": "button \"SUBMIT\" in section OPEN SUB-ACCOUNT - REVIEW [frame main]",
+          "fingerprint": {
+            "bbox": {
+              "height": 22.0,
+              "width": 80.0,
+              "x": 205.0,
+              "y": 274.0
+            },
+            "name": "SUBMIT",
+            "role": "button",
+            "tag": "input"
+          },
+          "frame": {
+            "name_path": [
+              "main"
+            ],
+            "url_path_pattern": "/subacct/review"
+          },
+          "strategies": [
+            {
+              "exact": true,
+              "kind": "role_name",
+              "name": "SUBMIT",
+              "role": "button"
+            },
+            {
+              "exact": true,
+              "kind": "text_match",
+              "text": "SUBMIT"
+            },
+            {
+              "brittle": true,
+              "kind": "css_path",
+              "selector": "html > body:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(2) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > input:nth-of-type(1)"
+            }
+          ]
+        },
+        "type": "click"
+      },
+      "approved": false,
+      "expect": {
+        "all_of": [
+          {
+            "frame": {
+              "name_path": [
+                "main"
+              ],
+              "url_path_pattern": "/subacct/submit"
+            },
+            "kind": "url_matches",
+            "path_glob": "/subacct/submit"
+          },
+          {
+            "exact": false,
+            "frame": {
+              "name_path": [
+                "main"
+              ],
+              "url_path_pattern": "/subacct/submit"
+            },
+            "kind": "text_present",
+            "text": "OPEN SUB-ACCOUNT - CONFIRMATION"
+          }
+        ],
+        "description": "postcondition recorded during discovery",
+        "timeout_ms": 5000
+      },
+      "id": "s07_click_submit",
+      "intent": "Submit the reviewed sub-account details to reach the confirmation screen.",
+      "requires_approval": true,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "irreversible",
+      "settle_timeout_ms": 15000
+    },
+    {
+      "action": {
+        "output": "confirmation_number",
+        "target": {
+          "description": "text \"<value>\" in section OPEN SUB-ACCOUNT - CONFIRMATION [frame main]",
+          "fingerprint": {
+            "bbox": {
+              "height": 19.0,
+              "width": 528.578125,
+              "x": 205.0,
+              "y": 99.0
+            },
+            "name": "SUB-ACCOUNT OPENED — CONFIRMATION NO. MC-539968",
+            "role": "text",
+            "tag": "b"
+          },
+          "frame": {
+            "name_path": [
+              "main"
+            ],
+            "url_path_pattern": "/subacct/submit"
+          },
+          "strategies": [
+            {
+              "brittle": true,
+              "kind": "css_path",
+              "selector": "html > body:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > font:nth-of-type(1) > b:nth-of-type(1)"
+            }
+          ]
+        },
+        "type": "extract"
+      },
+      "approved": false,
+      "id": "s08_extract_confirmation_number",
+      "intent": "Extract the confirmation number from the confirmation screen.",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "safe",
+      "settle_timeout_ms": 15000
+    }
+  ],
+  "success": {
+    "all_of": [
+      {
+        "frame": {
+          "name_path": [
+            "main"
+          ],
+          "url_path_pattern": "/subacct/submit"
+        },
+        "kind": "url_matches",
+        "path_glob": "/subacct/submit"
+      },
+      {
+        "exact": false,
+        "frame": {
+          "name_path": [
+            "main"
+          ],
+          "url_path_pattern": "/subacct/submit"
+        },
+        "kind": "text_present",
+        "text": "OPEN SUB-ACCOUNT - CONFIRMATION"
+      },
+      {
+        "kind": "target_present",
+        "target": {
+          "description": "text \"<value>\" in section OPEN SUB-ACCOUNT - CONFIRMATION [frame main]",
+          "fingerprint": {
+            "bbox": {
+              "height": 19.0,
+              "width": 528.578125,
+              "x": 205.0,
+              "y": 99.0
+            },
+            "name": "SUB-ACCOUNT OPENED — CONFIRMATION NO. MC-539968",
+            "role": "text",
+            "tag": "b"
+          },
+          "frame": {
+            "name_path": [
+              "main"
+            ],
+            "url_path_pattern": "/subacct/submit"
+          },
+          "strategies": [
+            {
+              "brittle": true,
+              "kind": "css_path",
+              "selector": "html > body:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > font:nth-of-type(1) > b:nth-of-type(1)"
+            }
+          ]
+        }
+      }
+    ],
+    "description": "final page shows the extracted values",
+    "timeout_ms": 5000
+  },
+  "title": "Open a sub-account for a member",
+  "use_profile_outcomes": [
+    "member_not_found",
+    "invalid_member_format",
+    "access_denied",
+    "deposit_out_of_range",
+    "invalid_deposit_amount"
+  ],
+  "version": "1.0.0"
+}

@@ -1,0 +1,456 @@
+{
+  "app": {
+    "product": "meridian-core",
+    "product_versions": ">=4.2,<5",
+    "profile": "meridian-core",
+    "surface": "web"
+  },
+  "description": "Look up member 12345 and read their Share Savings balance",
+  "id": "meridian.member.read_savings_balance",
+  "inputs": [
+    {
+      "description": "member id",
+      "example": "12345",
+      "name": "member_id",
+      "pattern": "^\\d{5}$",
+      "required": true,
+      "sensitive": false,
+      "type": "string"
+    }
+  ],
+  "outcomes": [],
+  "outputs": [
+    {
+      "description": "savings balance",
+      "name": "savings_balance",
+      "normalize": "money_to_decimal",
+      "nullable": false,
+      "sensitive": false,
+      "type": "money"
+    }
+  ],
+  "preconditions": {
+    "entry_path": "/login",
+    "session": "login_subflow"
+  },
+  "provenance": {
+    "evidence_dir": "runs/20261103T171959Z-7374a1",
+    "git_commit": "24f5e6ea24dd143f1b45a4e5c835183f3ff699bc",
+    "goal_redacted": "Look up member 12345 and read their Share Savings balance",
+    "model_id": "us.anthropic.claude-sonnet-4-6",
+    "recorded_at": "2026-11-03T17:19:59.917862Z",
+    "recorded_from_run_id": "20261103T171959Z-7374a1",
+    "recorder_version": "recorder-v1+discovery-v1 (cua 0.1.0)",
+    "source": "discovery",
+    "transcript_sha256": "10fb5ae750cb132d8d5266fed17e8d70666c966ed1b4bfac1f3f8970882cdfca"
+  },
+  "review": {},
+  "schema_version": "1.0",
+  "secrets": [],
+  "status": "draft",
+  "steps": [
+    {
+      "action": {
+        "target": {
+          "description": "button \"MEMBER INQUIRY\" in section FUNCTIONS [frame nav]",
+          "fingerprint": {
+            "bbox": {
+              "height": 22.0,
+              "width": 182.0,
+              "x": 4.0,
+              "y": 96.0
+            },
+            "name": "MEMBER INQUIRY",
+            "role": "button",
+            "tag": "td"
+          },
+          "frame": {
+            "name_path": [
+              "nav"
+            ],
+            "url_path_pattern": "/nav"
+          },
+          "strategies": [
+            {
+              "exact": true,
+              "kind": "role_name",
+              "name": "MEMBER INQUIRY",
+              "role": "button"
+            },
+            {
+              "exact": true,
+              "kind": "text_match",
+              "text": "MEMBER INQUIRY"
+            },
+            {
+              "brittle": true,
+              "kind": "css_path",
+              "selector": "html > body:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1)"
+            }
+          ]
+        },
+        "type": "click"
+      },
+      "approved": false,
+      "expect": {
+        "all_of": [
+          {
+            "frame": {
+              "name_path": [
+                "main"
+              ],
+              "url_path_pattern": "/inquiry"
+            },
+            "kind": "url_matches",
+            "path_glob": "/inquiry"
+          },
+          {
+            "exact": false,
+            "frame": {
+              "name_path": [
+                "main"
+              ],
+              "url_path_pattern": "/inquiry"
+            },
+            "kind": "text_present",
+            "text": "MEMBER INQUIRY"
+          }
+        ],
+        "description": "postcondition recorded during discovery",
+        "timeout_ms": 5000
+      },
+      "id": "s01_click_member_inquiry",
+      "intent": "Open the Member Inquiry screen to look up member {{inputs.member_id}}.",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "risky",
+      "settle_timeout_ms": 15000
+    },
+    {
+      "action": {
+        "target": {
+          "description": "textbox \"MEMBER NO.\" in section MEMBER INQUIRY [frame main]",
+          "fingerprint": {
+            "bbox": {
+              "height": 18.0,
+              "width": 67.0,
+              "x": 323.296875,
+              "y": 96.5
+            },
+            "name": "MEMBER NO.",
+            "role": "textbox",
+            "tag": "input"
+          },
+          "frame": {
+            "name_path": [
+              "main"
+            ],
+            "url_path_pattern": "/inquiry"
+          },
+          "strategies": [
+            {
+              "exact": true,
+              "kind": "role_name",
+              "name": "MEMBER NO.",
+              "role": "textbox"
+            },
+            {
+              "kind": "label_anchor",
+              "label": "MEMBER NO.",
+              "role": "textbox"
+            },
+            {
+              "brittle": true,
+              "kind": "css_path",
+              "selector": "html > body:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(2) > input:nth-of-type(1)"
+            }
+          ]
+        },
+        "type": "fill",
+        "value": "{{inputs.member_id}}"
+      },
+      "approved": false,
+      "id": "s02_fill_member_no",
+      "intent": "Enter the member ID to look up member {{inputs.member_id}}.",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "safe",
+      "settle_timeout_ms": 15000
+    },
+    {
+      "action": {
+        "target": {
+          "description": "link \"INQUIRE\" (label MEMBER NO.) in section MEMBER INQUIRY [frame main]",
+          "fingerprint": {
+            "bbox": {
+              "height": 21.0,
+              "width": 79.734375,
+              "x": 396.296875,
+              "y": 95.0
+            },
+            "name": "INQUIRE",
+            "role": "link",
+            "tag": "a"
+          },
+          "frame": {
+            "name_path": [
+              "main"
+            ],
+            "url_path_pattern": "/inquiry"
+          },
+          "strategies": [
+            {
+              "exact": true,
+              "kind": "role_name",
+              "name": "INQUIRE",
+              "role": "link"
+            },
+            {
+              "kind": "label_anchor",
+              "label": "MEMBER NO.",
+              "role": "link"
+            },
+            {
+              "exact": true,
+              "kind": "text_match",
+              "text": "INQUIRE"
+            },
+            {
+              "brittle": true,
+              "kind": "css_path",
+              "selector": "html > body:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(3) > a:nth-of-type(1)"
+            }
+          ]
+        },
+        "type": "click"
+      },
+      "approved": false,
+      "id": "s03_click_inquire",
+      "intent": "Submit the member ID to retrieve member {{inputs.member_id}}'s account information.",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "risky",
+      "settle_timeout_ms": 15000
+    },
+    {
+      "action": {
+        "target": {
+          "description": "link \"[REDACTED:NAME]\" (label {{inputs.member_id}}) in section MEMBER INQUIRY [frame main]",
+          "fingerprint": {
+            "bbox": {
+              "height": 19.0,
+              "width": 137.40625,
+              "x": 417.046875,
+              "y": 163.0
+            },
+            "name": "[REDACTED:NAME]",
+            "role": "link",
+            "tag": "a"
+          },
+          "frame": {
+            "name_path": [
+              "main"
+            ],
+            "url_path_pattern": "/inquiry"
+          },
+          "strategies": [
+            {
+              "column_header": "NAME",
+              "kind": "table_cell",
+              "row_key": "{{inputs.member_id}}",
+              "section_header": "MEMBER INQUIRY"
+            },
+            {
+              "brittle": true,
+              "kind": "css_path",
+              "selector": "html > body:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(2) > a:nth-of-type(1)"
+            }
+          ]
+        },
+        "type": "click"
+      },
+      "approved": false,
+      "expect": {
+        "all_of": [
+          {
+            "frame": {
+              "name_path": [
+                "main"
+              ],
+              "url_path_pattern": "/member/detail"
+            },
+            "kind": "url_matches",
+            "path_glob": "/member/detail"
+          },
+          {
+            "exact": false,
+            "frame": {
+              "name_path": [
+                "main"
+              ],
+              "url_path_pattern": "/member/detail"
+            },
+            "kind": "text_present",
+            "text": "MEMBER DETAIL - {{inputs.member_id}}"
+          }
+        ],
+        "description": "postcondition recorded during discovery",
+        "timeout_ms": 5000
+      },
+      "id": "s04_click_name",
+      "intent": "Open member {{inputs.member_id}}'s account details to find their Share Savings balance.",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "risky",
+      "settle_timeout_ms": 15000
+    },
+    {
+      "action": {
+        "output": "savings_balance",
+        "target": {
+          "description": "cell \"<value>\" in section ACCOUNTS [frame main]",
+          "fingerprint": {
+            "bbox": {
+              "height": 27.0,
+              "width": 382.0,
+              "x": 879.0,
+              "y": 321.0
+            },
+            "name": "$12,345.67",
+            "role": "cell",
+            "tag": "td"
+          },
+          "frame": {
+            "name_path": [
+              "main"
+            ],
+            "url_path_pattern": "/member/detail"
+          },
+          "strategies": [
+            {
+              "column_header": "BALANCE",
+              "kind": "table_cell",
+              "row_key": "00",
+              "section_header": "ACCOUNTS"
+            },
+            {
+              "brittle": true,
+              "kind": "css_path",
+              "selector": "html > body:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(3)"
+            }
+          ]
+        },
+        "type": "extract"
+      },
+      "approved": false,
+      "id": "s05_extract_savings_balance",
+      "intent": "Extract the Share Savings balance for member {{inputs.member_id}}.",
+      "requires_approval": false,
+      "retry": {
+        "backoff_ms": 500,
+        "max_attempts": 1,
+        "on": [
+          "settle_timeout"
+        ]
+      },
+      "risk": "safe",
+      "settle_timeout_ms": 15000
+    }
+  ],
+  "success": {
+    "all_of": [
+      {
+        "frame": {
+          "name_path": [
+            "main"
+          ],
+          "url_path_pattern": "/member/detail"
+        },
+        "kind": "url_matches",
+        "path_glob": "/member/detail"
+      },
+      {
+        "exact": false,
+        "frame": {
+          "name_path": [
+            "main"
+          ],
+          "url_path_pattern": "/member/detail"
+        },
+        "kind": "text_present",
+        "text": "MEMBER DETAIL - {{inputs.member_id}}"
+      },
+      {
+        "kind": "target_present",
+        "target": {
+          "description": "cell \"<value>\" in section ACCOUNTS [frame main]",
+          "fingerprint": {
+            "bbox": {
+              "height": 27.0,
+              "width": 382.0,
+              "x": 879.0,
+              "y": 321.0
+            },
+            "name": "$12,345.67",
+            "role": "cell",
+            "tag": "td"
+          },
+          "frame": {
+            "name_path": [
+              "main"
+            ],
+            "url_path_pattern": "/member/detail"
+          },
+          "strategies": [
+            {
+              "column_header": "BALANCE",
+              "kind": "table_cell",
+              "row_key": "00",
+              "section_header": "ACCOUNTS"
+            },
+            {
+              "brittle": true,
+              "kind": "css_path",
+              "selector": "html > body:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(3)"
+            }
+          ]
+        }
+      }
+    ],
+    "description": "final page shows the extracted values",
+    "timeout_ms": 5000
+  },
+  "title": "Read a member's share savings balance",
+  "use_profile_outcomes": [
+    "member_not_found",
+    "invalid_member_format",
+    "access_denied",
+    "deposit_out_of_range",
+    "invalid_deposit_amount"
+  ],
+  "version": "1.0.0"
+}

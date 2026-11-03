@@ -7,6 +7,7 @@ opt-in, the trace lives only under runs/ (gitignored), and it must never be copi
 committed evidence/ without manual review. It is excluded from the "grep the run dir" guarantee.
 """
 
+import json
 import subprocess
 import uuid
 from datetime import UTC, datetime
@@ -14,6 +15,7 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 from pydantic import BaseModel
+from pydantic_core import to_jsonable_python
 
 from cua.policy.redaction import Redactor
 
@@ -76,6 +78,14 @@ class RunContext:
     def _write_manifest(self) -> None:
         redacted = self.redactor.redact(self.manifest)
         (self.dir / "manifest.json").write_text(redacted.model_dump_json(indent=2))
+
+    def write_json(self, name: str, data: object) -> Path:
+        """Write a redacted JSON document (e.g. summary.json) into the run directory."""
+        path = self.dir / name
+        redacted = self.redactor.redact(to_jsonable_python(data))
+        path.write_text(json.dumps(redacted, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
+                        encoding="utf-8")
+        return path
 
     def rel(self, path: Path) -> str:
         return str(path.relative_to(self.dir))
