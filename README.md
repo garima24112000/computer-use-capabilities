@@ -15,6 +15,14 @@ nested tables, no ids/ARIA/labels, `javascript:` links, and counter-based fault 
 - Evidence index (discovery, replay, HITL): [evidence/README.md](evidence/README.md)
 - HITL handoff video: [evidence/hitl/hitl_handoff.mp4](evidence/hitl/hitl_handoff.mp4)
 
+**Live human handoff demo (3 min, voiceover):**
+
+  
+
+https://github.com/user-attachments/assets/ece32f34-b56d-4d1c-beae-c606183e6870
+
+
+
 ## Repository layout
 
 ```
