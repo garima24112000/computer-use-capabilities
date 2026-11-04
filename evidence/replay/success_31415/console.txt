@@ -1,5 +1,5 @@
-SUCCESS  meridian.member.read_savings_balance v1.1.0  (approved)  4012 ms  run 20261104T055458Z-a50062
+SUCCESS  meridian.member.read_savings_balance v1.1.0  (approved)  3917 ms  run 20261104T083807Z-b6bd30
   output  savings_balance = 3141.59
-  evidence dir: .
+  evidence dir: evidence/replay/success_31415
 
 [exit code 0]

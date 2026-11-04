@@ -1,5 +1,5 @@
-SUCCESS  meridian.member.read_savings_balance v1.1.0  (approved)  3986 ms  run 20261104T055551Z-2425da
+SUCCESS  meridian.member.read_savings_balance v1.1.0  (approved)  3991 ms  run 20261104T083900Z-de4306
   output  savings_balance = 12345.67
-  evidence dir: .
+  evidence dir: evidence/replay/drift_tenant_b_override
 
 [exit code 0]

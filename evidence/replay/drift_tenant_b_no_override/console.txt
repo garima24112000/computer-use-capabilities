@@ -1,10 +1,10 @@
-FAILED  meridian.member.read_savings_balance v1.1.0  (approved)  2872 ms  run 20261104T055556Z-6b1c7a
+FAILED  meridian.member.read_savings_balance v1.1.0  (approved)  2841 ms  run 20261104T083904Z-a5bd63
   failure structural_only_on_risky at s03_click_inquire (retryable=false)
     expected: a semantic locator for risky step 'link "INQUIRE" (label MEMBER NO.) in section MEMBER INQUIRY [frame main]'
     observed: only the structural css_path matched; refusing to act on structure alone
-    evidence: screenshots/003-failure-structural-only-on-risky.png, snapshots/003-failure.txt
+    evidence: evidence/replay/drift_tenant_b_no_override/screenshots/003-failure-structural-only-on-risky.png, evidence/replay/drift_tenant_b_no_override/snapshots/003-failure.txt
   drift   s02_fill_member_no: won by css_path (#2) degraded, STRUCTURAL ONLY
   drift   s03_click_inquire: won by css_path (#3) degraded, STRUCTURAL ONLY
-  evidence dir: .
+  evidence dir: evidence/replay/drift_tenant_b_no_override
 
 [exit code 20]

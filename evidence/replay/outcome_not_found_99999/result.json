@@ -6,8 +6,8 @@
     "version": "1.1.0"
   },
   "drift": [],
-  "duration_ms": 3259.8,
-  "evidence_dir": ".",
+  "duration_ms": 3283.4,
+  "evidence_dir": "evidence/replay/outcome_not_found_99999",
   "failure": null,
   "inputs": {
     "member_id": "99999"
@@ -21,17 +21,17 @@
   },
   "outputs": null,
   "recoveries": [],
-  "run_id": "20261104T055503Z-1f5a1e",
-  "started_at": "2026-11-04T05:55:03.156357Z",
+  "run_id": "20261104T083811Z-632e25",
+  "started_at": "2026-11-04T08:38:11.745007Z",
   "status": "business_outcome",
   "steps": [
     {
-      "duration_ms": 501.8,
+      "duration_ms": 499.6,
       "status": "ok",
       "step_id": "s01_click_member_inquiry"
     },
     {
-      "duration_ms": 416.8,
+      "duration_ms": 474.1,
       "status": "ok",
       "step_id": "s02_fill_member_no"
     },

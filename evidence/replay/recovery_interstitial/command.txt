@@ -1,1 +1,1 @@
-uv run cua replay meridian.member.read_savings_balance@1.1.0 --input member_id=12345 --inject-at s03_click_inquire '{"interstitial_count": 1}' --no-start-app --base-url http://127.0.0.1:52322 --runs-dir runs/_evidence/recovery_interstitial
+uv run cua replay meridian.member.read_savings_balance@1.1.0 --input member_id=12345 --inject-at s03_click_inquire '{"interstitial_count": 1}' --no-start-app --base-url http://127.0.0.1:57721 --runs-dir runs/_evidence/recovery_interstitial

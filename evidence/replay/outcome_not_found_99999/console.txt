@@ -1,5 +1,5 @@
-BUSINESS_OUTCOME  meridian.member.read_savings_balance v1.1.0  (approved)  3260 ms  run 20261104T055503Z-1f5a1e
+BUSINESS_OUTCOME  meridian.member.read_savings_balance v1.1.0  (approved)  3283 ms  run 20261104T083811Z-632e25
   outcome MEMBER_NOT_FOUND (member_not_found): No records found for the requested member number.
-  evidence dir: .
+  evidence dir: evidence/replay/outcome_not_found_99999
 
 [exit code 10]

@@ -264,9 +264,8 @@ def run_scenario(s: Scenario, apps: dict[str, App]) -> dict:
                 if (p / sub).is_dir() and any((p / sub).iterdir()):
                     shutil.copytree(p / sub, dst / sub, dirs_exist_ok=True)
     sanitize_tree(dst)
-    for p in run_dirs:  # paths into the scratch run dir -> the copies next to this file
-        _rewrite(dst, f"{work}/{p.name}/", "")
-        _rewrite(dst, f"{work}/{p.name}", ".")
+    for p in run_dirs:  # paths into the scratch run dir -> this folder, repo-relative
+        _rewrite(dst, f"{work}/{p.name}", str(dst.relative_to(ROOT)))
     console = (dst / "console.txt").read_text()
     return {"scenario": s.name, "proves": s.proves, "status": results[0]["status"] if results
             else "?", "exit": proc.returncode, "key": key_line(s, results, console) if results

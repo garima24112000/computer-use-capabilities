@@ -1,7 +1,7 @@
-FAILED  meridian.subaccount.open v1.1.0  (approved)  1 ms  run 20261104T055624Z-b149c2
+FAILED  meridian.subaccount.open v1.1.0  (approved)  1 ms  run 20261104T083933Z-6e17ce
   failure input_validation at - (retryable=false)
     expected: inputs matching the capability contract
     observed: initial_deposit='20000': must be <= 10000
-  evidence dir: .
+  evidence dir: evidence/replay/subaccount_deposit_out_of_bounds
 
 [exit code 20]

@@ -1,9 +1,9 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!! FAULT INJECTED (harness): [{'faults': {'js_confirm_count': 1}, 'at_step': None}]
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-SUCCESS  meridian.member.read_savings_balance v1.1.0  (approved)  3955 ms  run 20261104T055515Z-5c8cdd
+SUCCESS  meridian.member.read_savings_balance v1.1.0  (approved)  3996 ms  run 20261104T083823Z-a1ca99
   output  savings_balance = 12345.67
   recovery dialog:unposted_items at s04_click_name confirm accepted
-  evidence dir: .
+  evidence dir: evidence/replay/recovery_dialog
 
 [exit code 0]

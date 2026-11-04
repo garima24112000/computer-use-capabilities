@@ -1,9 +1,9 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!! FAULT INJECTED (harness): [{'faults': {'latency_ms': 17000, 'latency_count': 1}, 'at_step': 's03_click_inquire'}]
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-SUCCESS  meridian.member.read_savings_balance v1.1.0  (approved)  20744 ms  run 20261104T055526Z-acd0b2
+SUCCESS  meridian.member.read_savings_balance v1.1.0  (approved)  20754 ms  run 20261104T083834Z-f38809
   output  savings_balance = 12345.67
-  recovery settle_absorbed_by_checkpoint:slow_settle at s03_click_inquire no settle within 15000 ms (navigation pending: /inquiry); expect held after 17125 ms waited
-  evidence dir: .
+  recovery settle_absorbed_by_checkpoint:slow_settle at s03_click_inquire no settle within 15000 ms (navigation pending: /inquiry); expect held after 17048 ms waited
+  evidence dir: evidence/replay/recovery_slow_settle
 
 [exit code 0]

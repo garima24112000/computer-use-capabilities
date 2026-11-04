@@ -1,9 +1,9 @@
-SUCCESS  meridian.member.read_savings_balance v1.1.0  (approved)  3898 ms  run 20261104T055615Z-c6a8b8
+SUCCESS  meridian.member.read_savings_balance v1.1.0  (approved)  3823 ms  run 20261104T083923Z-c8c802
   output  savings_balance = 12345.67
-  evidence dir: .
+  evidence dir: evidence/replay/stability_repeat_5
 STABILITY over 5 runs: success=5
   identical step sequence: yes
   identical outputs:       yes
-  duration p50 3908 ms, p95 3935 ms
+  duration p50 3917 ms, p95 3961 ms
 
 [exit code 0]

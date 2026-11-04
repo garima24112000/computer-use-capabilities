@@ -1,1 +1,1 @@
-uv run cua replay meridian.member.read_savings_balance@1.1.0 --input member_id=31415 --no-start-app --base-url http://127.0.0.1:52322 --runs-dir runs/_evidence/success_31415
+uv run cua replay meridian.member.read_savings_balance@1.1.0 --input member_id=31415 --no-start-app --base-url http://127.0.0.1:57721 --runs-dir runs/_evidence/success_31415
