@@ -1,0 +1,6 @@
+SUCCESS  meridian.subaccount.open v1.1.0  (approved)  5061 ms  run 20261104T055619Z-effab9
+  output  confirmation_number = MC-919347
+  IRREVERSIBLE executed: s07_click_submit
+  evidence dir: .
+
+[exit code 0]

@@ -44,10 +44,15 @@
     "source": "discovery",
     "transcript_sha256": "ce779facf498e5be5057fc88122ca56a2dce65e7d3e911705084c66553640df7"
   },
-  "review": {},
+  "review": {
+    "approved_at": "2026-11-04T05:46:18Z",
+    "approved_content_hash": "sha256:52a72ca413bc30b1fd03ccccf237b2101ed106a7ed43467cbc4d5ff914568f4a",
+    "notes": "Reviewed contract, locators, checkpoints; no irreversible steps",
+    "reviewed_by": "Garima"
+  },
   "schema_version": "1.0",
   "secrets": [],
-  "status": "draft",
+  "status": "approved",
   "steps": [
     {
       "action": {

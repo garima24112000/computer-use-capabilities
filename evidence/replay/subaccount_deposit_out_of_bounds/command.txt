@@ -1,0 +1,1 @@
+uv run cua replay meridian.subaccount.open@1.1.0 --input member_id=31415 --input 'account_type=Share Savings' --input initial_deposit=20000 --no-start-app --base-url http://127.0.0.1:52322 --runs-dir runs/_evidence/subaccount_deposit_out_of_bounds

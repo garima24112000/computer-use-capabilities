@@ -1,0 +1,88 @@
+--- 1.0.0 (cua artifact show)
++++ 1.1.0 (cua artifact show)
+@@ -1,34 +1,24 @@
+-> **Rejected by today's lint** (`cua artifact show` exits 1). Rendered below with lint bypassed, for history only.
+->
+-> ```
+-> INVALID capabilities/meridian.subaccount.open/1.0.0.json
+-> 1 validation error for Capability
+->   Value error, 1 lint error(s):
+-> [extract_structural_only] steps[7:s08_extract_confirmation_number].action.target: extract target has only css_path strategies; it needs a TableCell, LabelAnchor or stable TextMatch (with the output's extract_pattern) [type=value_error, input_value={'app': {'product': 'meri...t'], 'version': '1.0.0'}, input_type=dict]
+->     For further information visit https://errors.pydantic.dev/2.14/v/value_error
+-> ```
+-
+ # Open a sub-account for a member
+ 
+-`meridian.subaccount.open` v1.0.0 · status **draft** · app meridian-core `>=4.2,<5` (profile `meridian-core`, web)
+-content hash `sha256:02e779854333aaf7b3fe708a28078afb1aef7f025186dc9ec6d6f8f14d2a6d10`
++`meridian.subaccount.open` v1.1.0 · status **approved** · app meridian-core `>=4.2,<5` (profile `meridian-core`, web)
++content hash `sha256:fbf40353dc57f1293b4d9db8e112e06248121f6ff844f75455049fbabe706720`
+ 
+-Open a new Money Market sub-account for member 22222 with an initial deposit of 250.00 and nickname Rainy Day, and reach the confirmation screen
++Opens a new sub-account with an initial deposit and returns the core's confirmation number. The final SUBMIT is irreversible and requires approval.
+ 
+ ## Inputs
+ 
+ | name | type | required | constraints | sensitive | description |
+ |---|---|---|---|---|---|
+-| `member_id` | string | yes | pattern `^\d{5}$` | no | member id |
++| `member_id` | string | yes | pattern `^\d{5}$` | no | 5-digit member number |
+ | `account_type` | enum | yes | one of `Share Savings`, `Money Market`, `Certificate 12mo` | no | account type |
+-| `initial_deposit` | decimal | yes | - | no | initial deposit |
+-| `nickname` | string | yes | - | no | nickname |
++| `initial_deposit` | decimal | yes | ≥ 0.01, ≤ 10000 | no | Initial deposit in dollars |
++| `nickname` | string | no | pattern `^[A-Za-z0-9 ]{0,20}$` | no | nickname |
+ 
+ ## Outputs
+ 
+ | name | type | normalize | sensitive | description |
+ |---|---|---|---|---|
+-| `confirmation_number` | string | none | no | confirmation number |
++| `confirmation_number` | string | strip (pattern `(MC-\d{6})`) | no | confirmation number |
+ 
+ ## Preconditions
+ 
+@@ -52,7 +42,7 @@
+    - action: select `{{inputs.account_type}}` in combobox "ACCOUNT TYPE" in section OPEN SUB-ACCOUNT [frame main]
+    - risk: **safe**
+    - frame `main`; locators: role_name → label_anchor('ACCOUNT TYPE') → css_path
+-4. **`s04_fill_initial_deposit`**: Enter the initial deposit amount for the new {{inputs.account_type}} sub-account.
++4. **`s04_fill_initial_deposit`**: Enter the initial deposit amount of {{inputs.initial_deposit}} for the new {{inputs.account_type}} sub-account.
+    - action: fill `{{inputs.initial_deposit}}` into textbox "INITIAL DEPOSIT" in section OPEN SUB-ACCOUNT [frame main]
+    - risk: **safe**
+    - frame `main`; locators: role_name → label_anchor('INITIAL DEPOSIT') → css_path
+@@ -70,7 +60,7 @@
+        - all of: text_present[main] "OPEN SUB-ACCOUNT - REVIEW"
+ 7. **`s07_click_submit`**: Submit the reviewed sub-account details to reach the confirmation screen.
+    - action: click button "SUBMIT" in section OPEN SUB-ACCOUNT - REVIEW [frame main]
+-   - risk: **irreversible** · **requires approval** (NOT approved)
++   - risk: **irreversible** · **requires approval** (approved)
+    - frame `main`; locators: role_name → text_match → css_path
+    - expect:
+      - postcondition recorded during discovery (timeout 5000 ms)
+@@ -79,7 +69,7 @@
+ 8. **`s08_extract_confirmation_number`**: Extract the confirmation number from the confirmation screen.
+    - action: extract text "<value>" in section OPEN SUB-ACCOUNT - CONFIRMATION [frame main] → output `confirmation_number`
+    - risk: **safe**
+-   - frame `main`; locators: css_path
++   - frame `main`; locators: text_match(contains 'SUB-ACCOUNT OPENED — CONFIRMATION NO.') → css_path
+ 
+ ## Business outcomes
+ 
+@@ -90,12 +80,12 @@
+ - final page shows the extracted values (timeout 5000 ms)
+   - all of: url_matches[main] `/subacct/submit`
+   - all of: text_present[main] "OPEN SUB-ACCOUNT - CONFIRMATION"
+-  - all of: target_present[main] text "<value>" in section OPEN SUB-ACCOUNT - CONFIRMATION [frame main] (css_path)
++  - all of: target_present[main] text "<value>" in section OPEN SUB-ACCOUNT - CONFIRMATION [frame main] (text_match → css_path)
+ 
+ ## Provenance
+ 
+ - source: discovery; recorder recorder-v1+discovery-v1 (cua 0.1.0); model `us.anthropic.claude-sonnet-4-6`
+ - goal (redacted): Open a new Money Market sub-account for member 22222 with an initial deposit of 250.00 and nickname Rainy Day, and reach the confirmation screen
+-- run `20261103T174137Z-7b68e0` at 2026-11-03 17:41:37.984019+00:00; evidence `runs/20261103T174137Z-7b68e0`; transcript sha256 `93e6a90e8919b4401c79ced76ed5604a51e0d356da51a3d7c4a184e08f619b13`
+-- git commit `24f5e6ea24dd143f1b45a4e5c835183f3ff699bc`
+-- review: not reviewed
++- run `20261103T232205Z-a9b850` at 2026-11-03 23:22:05.822877+00:00; evidence `runs/20261103T232205Z-a9b850`; transcript sha256 `239aefbe9184b4730b2ab4d54133ee33c3469f37f5ffdca4003e5abcd095cb50`
++- git commit `2c30cff29a235b40ecf4c9a7c583c5e88c0b1cfd`
++- review: approved by Garima at 2026-11-03 23:29:09+00:00: Reviewed contract, locators and the irreversible SUBMIT step

@@ -1,0 +1,9 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!! FAULT INJECTED (harness): [{'faults': {'interstitial_count': 1}, 'at_step': 's03_click_inquire'}]
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+SUCCESS  meridian.member.read_savings_balance v1.1.0  (approved)  4447 ms  run 20261104T055510Z-f15f40
+  output  savings_balance = 12345.67
+  recovery interstitial:maintenance_notice at s03_click_inquire recovered (1/3)
+  evidence dir: .
+
+[exit code 0]

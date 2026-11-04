@@ -1,0 +1,5 @@
+SUCCESS  meridian.member.read_savings_balance v1.1.0  (approved)  4751 ms  run 20261104T055453Z-ee3c5b
+  output  savings_balance = 12345.67
+  evidence dir: .
+
+[exit code 0]

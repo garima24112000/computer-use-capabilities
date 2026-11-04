@@ -1,0 +1,57 @@
+{
+  "actions_executed": 5,
+  "artifact_path": "capabilities/meridian.member.read_savings_balance/1.1.0.json",
+  "executed_actions": [
+    {
+      "action": "click button \"MEMBER INQUIRY\"",
+      "ok": true,
+      "risk": "risky",
+      "rule_id": "default:click",
+      "turn": "t01",
+      "verdict": "allow"
+    },
+    {
+      "action": "fill textbox \"MEMBER NO.\"",
+      "ok": true,
+      "risk": "safe",
+      "rule_id": "default:fill",
+      "turn": "t02",
+      "verdict": "allow"
+    },
+    {
+      "action": "click link \"INQUIRE\"",
+      "ok": true,
+      "risk": "risky",
+      "rule_id": "default:click",
+      "turn": "t03",
+      "verdict": "allow"
+    },
+    {
+      "action": "click link \"[REDACTED:NAME]\"",
+      "ok": true,
+      "risk": "risky",
+      "rule_id": "default:click",
+      "turn": "t04",
+      "verdict": "allow"
+    }
+  ],
+  "irreversible_executed": false,
+  "irreversible_steps_executed": [],
+  "lint_errors": [],
+  "outcome": null,
+  "outputs": {
+    "savings_balance": "12345.67"
+  },
+  "reason": null,
+  "recorded_steps": 5,
+  "rejected_path": null,
+  "run_dir": "runs/20261103T232133Z-5d322d",
+  "run_id": "20261103T232133Z-5d322d",
+  "status": "completed",
+  "turns": 6,
+  "usage": {
+    "input_tokens": 17528,
+    "output_tokens": 446
+  },
+  "wall_s": 11.05
+}

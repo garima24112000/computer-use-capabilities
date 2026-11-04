@@ -1,0 +1,7 @@
+FAILED  meridian.member.read_savings_balance v1.1.0  (approved)  1 ms  run 20261104T055510Z-14cc46
+  failure input_validation at - (retryable=false)
+    expected: inputs matching the capability contract
+    observed: member_id='abc': does not match ^\d{5}$
+  evidence dir: .
+
+[exit code 20]

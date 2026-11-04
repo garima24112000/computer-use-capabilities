@@ -1,0 +1,3 @@
+{"ts":"2026-11-04T05:55:10.271544Z","run_id":"20261104T055510Z-14cc46","seq":1,"type":"replay_started","actor":"replay","step_id":null,"data":{"capability":"meridian.member.read_savings_balance","version":"1.1.0","approved":true,"tenant_override":null}}
+{"ts":"2026-11-04T05:55:10.272201Z","run_id":"20261104T055510Z-14cc46","seq":2,"type":"failure","actor":"replay","step_id":null,"data":{"category":"input_validation","retryable":false,"expected":"inputs matching the capability contract","observed":"member_id='abc': does not match ^\\d{5}$"}}
+{"ts":"2026-11-04T05:55:10.272417Z","run_id":"20261104T055510Z-14cc46","seq":3,"type":"replay_finished","actor":"replay","step_id":null,"data":{"status":"failed","category":"input_validation","outcome":null,"duration_ms":0.9}}

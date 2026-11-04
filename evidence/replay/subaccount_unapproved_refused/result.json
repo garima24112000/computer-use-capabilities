@@ -1,0 +1,38 @@
+{
+  "capability": {
+    "approved": false,
+    "content_hash": "sha256:fbf40353dc57f1293b4d9db8e112e06248121f6ff844f75455049fbabe706720",
+    "id": "meridian.subaccount.open",
+    "version": "1.1.0"
+  },
+  "drift": [],
+  "duration_ms": 1.1,
+  "evidence_dir": ".",
+  "failure": {
+    "category": "artifact_not_approved",
+    "escalation": null,
+    "evidence": {
+      "screenshot": null,
+      "snapshot": null
+    },
+    "expected": "an approved artifact (irreversible steps: s07_click_submit)",
+    "observed": "status=draft; approve it with `cua artifact approve <path> --reviewer NAME` after review",
+    "resolve_attempts": [],
+    "retryable": false,
+    "step_id": null
+  },
+  "inputs": {
+    "account_type": "Share Savings",
+    "initial_deposit": "100.00",
+    "member_id": "31415"
+  },
+  "irreversible_executed": [],
+  "irreversible_executed_by_human": false,
+  "outcome": null,
+  "outputs": null,
+  "recoveries": [],
+  "run_id": "20261104T055619Z-879714",
+  "started_at": "2026-11-04T05:56:19.332205Z",
+  "status": "failed",
+  "steps": []
+}

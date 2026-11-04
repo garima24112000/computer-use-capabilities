@@ -1,0 +1,90 @@
+{
+  "capability": {
+    "approved": true,
+    "content_hash": "sha256:fbf40353dc57f1293b4d9db8e112e06248121f6ff844f75455049fbabe706720",
+    "id": "meridian.subaccount.open",
+    "version": "1.1.0"
+  },
+  "drift": [],
+  "duration_ms": 5045.1,
+  "evidence_dir": ".",
+  "failure": {
+    "category": "session_expired_after_commit",
+    "escalation": {
+      "action": "stop",
+      "human_action_count": 0,
+      "human_action_summaries": [],
+      "human_irreversible": false,
+      "intervention_id": null,
+      "note": null,
+      "operator": null,
+      "resolution": null
+    },
+    "evidence": {
+      "screenshot": "screenshots/007-failure-session-expired-after-commit.png",
+      "snapshot": "snapshots/007-failure.txt"
+    },
+    "expected": "session alive until the capability finished",
+    "observed": "session expired after irreversible step(s) ['s07_click_submit']: a human must verify whether the commit happened before any retry",
+    "resolve_attempts": [],
+    "retryable": false,
+    "step_id": "s07_click_submit"
+  },
+  "inputs": {
+    "account_type": "Money Market",
+    "initial_deposit": "250.00",
+    "member_id": "55555"
+  },
+  "irreversible_executed": [
+    "s07_click_submit"
+  ],
+  "irreversible_executed_by_human": false,
+  "outcome": null,
+  "outputs": null,
+  "recoveries": [],
+  "run_id": "20261104T055625Z-55416b",
+  "started_at": "2026-11-04T05:56:25.228958Z",
+  "status": "failed",
+  "steps": [
+    {
+      "duration_ms": 446.9,
+      "status": "ok",
+      "step_id": "s01_click_open_sub_account"
+    },
+    {
+      "duration_ms": 431.9,
+      "status": "ok",
+      "step_id": "s02_fill_member_no"
+    },
+    {
+      "duration_ms": 451.1,
+      "status": "ok",
+      "step_id": "s03_select_account_type"
+    },
+    {
+      "duration_ms": 415.2,
+      "status": "ok",
+      "step_id": "s04_fill_initial_deposit"
+    },
+    {
+      "duration_ms": 434.4,
+      "status": "ok",
+      "step_id": "s05_fill_nickname"
+    },
+    {
+      "duration_ms": 498.5,
+      "status": "ok",
+      "step_id": "s06_click_continue"
+    },
+    {
+      "duration_ms": 0.0,
+      "status": "failed",
+      "step_id": "s07_click_submit"
+    },
+    {
+      "duration_ms": 0.0,
+      "status": "not_run",
+      "step_id": "s08_extract_confirmation_number"
+    }
+  ]
+}

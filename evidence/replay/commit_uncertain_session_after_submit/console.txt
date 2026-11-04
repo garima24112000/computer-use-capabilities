@@ -1,0 +1,12 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!! FAULT INJECTED (harness): [{'faults': {'expire_session_now': True}, 'at_step': 's07_click_submit'}]
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+FAILED  meridian.subaccount.open v1.1.0  (approved)  5045 ms  run 20261104T055625Z-55416b
+  failure session_expired_after_commit at s07_click_submit (retryable=false)
+    expected: session alive until the capability finished
+    observed: session expired after irreversible step(s) ['s07_click_submit']: a human must verify whether the commit happened before any retry
+    evidence: screenshots/007-failure-session-expired-after-commit.png, snapshots/007-failure.txt
+  IRREVERSIBLE executed: s07_click_submit
+  evidence dir: .
+
+[exit code 20]

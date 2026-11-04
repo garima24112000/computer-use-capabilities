@@ -1,0 +1,14 @@
+{
+  "run_id": "20261103T232205Z-a9b850",
+  "kind": "discovery",
+  "started_at": "2026-11-03T23:22:05.822877Z",
+  "finished_at": "2026-11-03T23:22:34.200178Z",
+  "status": "completed",
+  "capability": "meridian.subaccount.open",
+  "goal": "Open a new Money Market sub-account for member 22222 with an initial deposit of 250.00 and nickname Rainy Day, and reach the confirmation screen",
+  "tenant": "a",
+  "model_id": "us.anthropic.claude-sonnet-4-6",
+  "git_commit": "2c30cff29a235b40ecf4c9a7c583c5e88c0b1cfd",
+  "trace_enabled": false,
+  "harness_faults": []
+}

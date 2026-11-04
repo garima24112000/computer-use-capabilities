@@ -1,0 +1,7 @@
+FAILED  meridian.subaccount.open v1.1.0  (not approved)  1 ms  run 20261104T055619Z-879714
+  failure artifact_not_approved at - (retryable=false)
+    expected: an approved artifact (irreversible steps: s07_click_submit)
+    observed: status=draft; approve it with `cua artifact approve <path> --reviewer NAME` after review
+  evidence dir: .
+
+[exit code 20]

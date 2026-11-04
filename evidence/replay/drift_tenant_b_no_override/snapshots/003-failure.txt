@@ -1,0 +1,23 @@
+== frame top /top "PRAIRIE HARVEST FEDERAL CREDIT UNION - BANNER" ==
+[e1] text "PRAIRIE HARVEST FEDERAL CREDIT UNION" frame=top
+[e2] text "MERIDIAN CORE v4.2.1 - SERVICING CONSOLE" frame=top
+[e3] cell "OPERATOR: |" frame=top
+[e4] text "[REDACTED:SECRET]" frame=top
+[e5] link "SIGN OFF" frame=top
+-- text (top) --
+PRAIRIE HARVEST FEDERAL CREDIT UNION MERIDIAN CORE v4.2.1 - SERVICING CONSOLE OPERATOR: [REDACTED:SECRET] | SIGN OFF
+== frame nav /nav "PRAIRIE HARVEST FEDERAL CREDIT UNION - MENU" ==
+[e6] text "FUNCTIONS" frame=nav
+[e7] link "OPEN SUB-ACCOUNT" frame=nav
+[e8] button "MEMBER INQUIRY" frame=nav
+[e9] text "REPORTS" frame=nav
+[e10] text "(N/A)" frame=nav
+-- text (nav) --
+FUNCTIONS » OPEN SUB-ACCOUNT » MEMBER INQUIRY » REPORTS (N/A)
+== frame main /inquiry "PRAIRIE HARVEST FEDERAL CREDIT UNION - MEMBER INQUIRY" ==
+[e11] cell "MEMBER INQUIRY" frame=main
+[e12] text "ACCT HOLDER #" frame=main
+[e13] textbox "ACCT HOLDER #" (label: ACCT HOLDER #) has_value frame=main
+[e14] link "SEARCH" frame=main
+-- text (main) --
+MEMBER INQUIRY ACCT HOLDER # SEARCH

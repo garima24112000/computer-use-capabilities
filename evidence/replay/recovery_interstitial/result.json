@@ -1,0 +1,59 @@
+{
+  "capability": {
+    "approved": true,
+    "content_hash": "sha256:52a72ca413bc30b1fd03ccccf237b2101ed106a7ed43467cbc4d5ff914568f4a",
+    "id": "meridian.member.read_savings_balance",
+    "version": "1.1.0"
+  },
+  "drift": [],
+  "duration_ms": 4447.3,
+  "evidence_dir": ".",
+  "failure": null,
+  "inputs": {
+    "member_id": "12345"
+  },
+  "irreversible_executed": [],
+  "irreversible_executed_by_human": false,
+  "outcome": null,
+  "outputs": {
+    "savings_balance": "12345.67"
+  },
+  "recoveries": [
+    {
+      "detail": "recovered (1/3)",
+      "id": "maintenance_notice",
+      "kind": "interstitial",
+      "step_id": "s03_click_inquire"
+    }
+  ],
+  "run_id": "20261104T055510Z-f15f40",
+  "started_at": "2026-11-04T05:55:10.578503Z",
+  "status": "success",
+  "steps": [
+    {
+      "duration_ms": 498.7,
+      "status": "ok",
+      "step_id": "s01_click_member_inquiry"
+    },
+    {
+      "duration_ms": 417.0,
+      "status": "ok",
+      "step_id": "s02_fill_member_no"
+    },
+    {
+      "duration_ms": 919.1,
+      "status": "ok",
+      "step_id": "s03_click_inquire"
+    },
+    {
+      "duration_ms": 534.7,
+      "status": "ok",
+      "step_id": "s04_click_name"
+    },
+    {
+      "duration_ms": 114.7,
+      "status": "ok",
+      "step_id": "s05_extract_savings_balance"
+    }
+  ]
+}

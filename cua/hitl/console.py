@@ -184,6 +184,7 @@ def create_console(store: InterventionStore, runs_root: Path | None = None) -> F
           </table>
           {approval}{buttons}
           <h3>Human actions ({len(iv.human_actions)})</h3><ol>{actions}</ol>
+          <p>{iv.ignored_clicks} click(s) on empty areas ignored</p>
           {live}{shot}
           <script>/* reload only when the status changes, so typed fields are kept */
           setInterval(async () => {{

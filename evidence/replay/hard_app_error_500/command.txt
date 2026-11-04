@@ -1,0 +1,1 @@
+uv run cua replay meridian.member.read_savings_balance@1.1.0 --input member_id=12345 --inject-at s04_click_name '{"http500_count": 1, "http500_path_prefix": "/member"}' --no-start-app --base-url http://127.0.0.1:52322 --runs-dir runs/_evidence/hard_app_error_500

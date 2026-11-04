@@ -1,0 +1,1 @@
+uv run cua replay meridian.subaccount.open@1.1.0 --input member_id=55555 --input 'account_type=Money Market' --input initial_deposit=250.00 --inject-at s07_click_submit '{"expire_session_now": true}' --no-start-app --base-url http://127.0.0.1:52322 --runs-dir runs/_evidence/commit_uncertain_session_after_submit

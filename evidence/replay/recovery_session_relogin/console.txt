@@ -1,0 +1,9 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!! FAULT INJECTED (harness): [{'faults': {'expire_session_now': True}, 'at_step': 's03_click_inquire'}]
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+SUCCESS  meridian.member.read_savings_balance v1.1.0  (approved)  6833 ms  run 20261104T055519Z-836f41
+  output  savings_balance = 12345.67
+  recovery session_relogin:session_expired at s03_click_inquire re-ran login subflow; restarting from step 1
+  evidence dir: .
+
+[exit code 0]

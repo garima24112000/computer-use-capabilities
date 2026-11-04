@@ -67,7 +67,7 @@ class HitlSession:
         self.capture = HumanCapture(
             inner, self.redactor, self._classify, active=lambda: self.control.human_active,
             operator=lambda: self.control.lease.owner.removeprefix("human:"),
-            sink=self._record_action)
+            sink=self._record_action, on_ignored=self._ignored_click)
         self.capture.install()
         inner.page.on("framenavigated", lambda _f: self._paint())
         self._paint()
@@ -139,6 +139,10 @@ class HitlSession:
                       intervention=self.current.id if self.current else None, **data)
         if self.current is not None:
             self.store.add_human_action(self.current.id, action)
+
+    def _ignored_click(self) -> None:
+        if self.current is not None:
+            self.store.count_ignored_click(self.current.id)
 
     def session_check(self, stage: str) -> dict[str, str]:
         """Same-session evidence: the BrowserContext identity and a hash of the cookies."""

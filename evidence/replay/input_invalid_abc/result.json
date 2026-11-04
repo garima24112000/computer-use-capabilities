@@ -1,0 +1,36 @@
+{
+  "capability": {
+    "approved": true,
+    "content_hash": "sha256:52a72ca413bc30b1fd03ccccf237b2101ed106a7ed43467cbc4d5ff914568f4a",
+    "id": "meridian.member.read_savings_balance",
+    "version": "1.1.0"
+  },
+  "drift": [],
+  "duration_ms": 0.9,
+  "evidence_dir": ".",
+  "failure": {
+    "category": "input_validation",
+    "escalation": null,
+    "evidence": {
+      "screenshot": null,
+      "snapshot": null
+    },
+    "expected": "inputs matching the capability contract",
+    "observed": "member_id='abc': does not match ^\\d{5}$",
+    "resolve_attempts": [],
+    "retryable": false,
+    "step_id": null
+  },
+  "inputs": {
+    "member_id": "abc"
+  },
+  "irreversible_executed": [],
+  "irreversible_executed_by_human": false,
+  "outcome": null,
+  "outputs": null,
+  "recoveries": [],
+  "run_id": "20261104T055510Z-14cc46",
+  "started_at": "2026-11-04T05:55:10.271425Z",
+  "status": "failed",
+  "steps": []
+}

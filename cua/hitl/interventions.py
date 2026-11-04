@@ -71,6 +71,7 @@ class InterventionRequest(BaseModel):
     resolution: Resolution | None = None
     operator_note: str | None = None
     human_actions: list[HumanAction] = Field(default_factory=list)
+    ignored_clicks: int = 0  # human clicks on nothing nameable (not recorded as actions)
     live_view: LiveView = Field(default_factory=lambda: LiveView(headed=False))
 
 
@@ -197,6 +198,16 @@ class InterventionStore:
         with self._tx() as db:
             db.execute("INSERT INTO human_actions VALUES (?,?,?)",
                        (iid, action.seq, action.model_dump_json()))
+
+    def count_ignored_click(self, iid: str) -> None:
+        with self._tx() as db:
+            row = db.execute("SELECT data FROM interventions WHERE id=?", (iid,)).fetchone()
+            if row is None:
+                raise KeyError(iid)
+            req = InterventionRequest.model_validate_json(row[0])
+            req.ignored_clicks += 1
+            db.execute("UPDATE interventions SET data=? WHERE id=?",
+                       (req.model_dump_json(exclude={"human_actions"}), iid))
 
     # --- control mirror (for the console) --------------------------------------------------------
 

@@ -1,0 +1,83 @@
+{
+  "actions_executed": 8,
+  "artifact_path": "capabilities/meridian.subaccount.open/1.1.0.json",
+  "executed_actions": [
+    {
+      "action": "click link \"OPEN SUB-ACCOUNT\"",
+      "ok": true,
+      "risk": "risky",
+      "rule_id": "default:click",
+      "turn": "t01",
+      "verdict": "allow"
+    },
+    {
+      "action": "fill textbox \"MEMBER NO.\"",
+      "ok": true,
+      "risk": "safe",
+      "rule_id": "default:fill",
+      "turn": "t02",
+      "verdict": "allow"
+    },
+    {
+      "action": "select combobox \"ACCOUNT TYPE\"",
+      "ok": true,
+      "risk": "safe",
+      "rule_id": "default:select",
+      "turn": "t03",
+      "verdict": "allow"
+    },
+    {
+      "action": "fill textbox \"INITIAL DEPOSIT\"",
+      "ok": true,
+      "risk": "safe",
+      "rule_id": "default:fill",
+      "turn": "t04",
+      "verdict": "allow"
+    },
+    {
+      "action": "fill textbox \"NICKNAME\"",
+      "ok": true,
+      "risk": "safe",
+      "rule_id": "default:fill",
+      "turn": "t05",
+      "verdict": "allow"
+    },
+    {
+      "action": "click button \"CONTINUE\"",
+      "ok": true,
+      "risk": "risky",
+      "rule_id": "default:click",
+      "turn": "t06",
+      "verdict": "allow"
+    },
+    {
+      "action": "click button \"SUBMIT\"",
+      "ok": true,
+      "risk": "irreversible",
+      "rule_id": "subacct-submit",
+      "turn": "t07",
+      "verdict": "require_approval"
+    }
+  ],
+  "irreversible_executed": true,
+  "irreversible_steps_executed": [
+    "t07 click button \"SUBMIT\""
+  ],
+  "lint_errors": [],
+  "outcome": null,
+  "outputs": {
+    "confirmation_number": "MC-539968"
+  },
+  "reason": null,
+  "recorded_steps": 8,
+  "rejected_path": null,
+  "run_dir": "runs/20261103T232205Z-a9b850",
+  "run_id": "20261103T232205Z-a9b850",
+  "status": "completed",
+  "turns": 9,
+  "usage": {
+    "input_tokens": 28890,
+    "output_tokens": 724
+  },
+  "wall_s": 27.05
+}

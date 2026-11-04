@@ -1,0 +1,22 @@
+{
+  "run_id": "20261104T013251Z-964956",
+  "kind": "replay",
+  "started_at": "2026-11-04T01:32:51.436512Z",
+  "finished_at": "2026-11-04T01:35:11.778707Z",
+  "status": "success",
+  "capability": "meridian.member.read_savings_balance",
+  "goal": null,
+  "tenant": "a",
+  "model_id": null,
+  "git_commit": "e9c20244d85ca4e2c5221cd4be10890afa734c79",
+  "trace_enabled": false,
+  "harness_faults": [
+    {
+      "faults": {
+        "http500_count": 1,
+        "http500_path_prefix": "/member"
+      },
+      "at_step": "s04_click_name"
+    }
+  ]
+}

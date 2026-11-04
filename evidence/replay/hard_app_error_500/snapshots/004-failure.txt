@@ -1,0 +1,21 @@
+== frame top /top "LAKESHORE MUTUAL CREDIT UNION - BANNER" ==
+[e1] text "LAKESHORE MUTUAL CREDIT UNION" frame=top
+[e2] text "MERIDIAN CORE v4.2.1 - SERVICING CONSOLE" frame=top
+[e3] cell "OPERATOR: |" frame=top
+[e4] text "[REDACTED:SECRET]" frame=top
+[e5] link "SIGN OFF" frame=top
+-- text (top) --
+LAKESHORE MUTUAL CREDIT UNION MERIDIAN CORE v4.2.1 - SERVICING CONSOLE OPERATOR: [REDACTED:SECRET] | SIGN OFF
+== frame nav /nav "LAKESHORE MUTUAL CREDIT UNION - MENU" ==
+[e6] text "FUNCTIONS" frame=nav
+[e7] button "MEMBER INQUIRY" frame=nav
+[e8] link "OPEN SUB-ACCOUNT" frame=nav
+[e9] text "REPORTS" frame=nav
+[e10] text "(N/A)" frame=nav
+-- text (nav) --
+FUNCTIONS » MEMBER INQUIRY » OPEN SUB-ACCOUNT » REPORTS (N/A)
+== frame main /member/detail "LAKESHORE MUTUAL CREDIT UNION - SYSTEM ERROR" ==
+[e11] text "SYSTEM ERROR 0xC0FFEE — CONTACT ADMINISTRATOR" frame=main
+[e12] text "MODULE: MCSRV32.DLL TRANSACTION ROLLED BACK." frame=main
+-- text (main) --
+SYSTEM ERROR 0xC0FFEE — CONTACT ADMINISTRATOR MODULE: MCSRV32.DLL TRANSACTION ROLLED BACK.

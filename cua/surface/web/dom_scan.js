@@ -1,6 +1,7 @@
 // Element enumeration for one frame. Evaluated by Playwright as `frame.evaluate(SCAN_JS, opts)`.
 // opts: {mode: "observe" | "resolve", start: int, maxText: int, maxFrameText: int, only?: Element}
 //  - only: describe just this element (or its nearest interactive ancestor) with the same logic;
+//    no element if it is neither interactive nor a scannable text element;
 //    used by human-action capture. Elements inside [data-cua-ignore] (our banner) are skipped.
 //  - observe: clears and reassigns sequential `data-cua-ref` attributes (e<start+1>...).
 //  - resolve: leaves `data-cua-ref` untouched (so the last observation's refs stay valid).
@@ -228,8 +229,10 @@
     if (el.closest('[data-cua-ignore]')) continue;
     if (el.closest('select, script, style, noscript')  && el.tagName !== 'SELECT') continue;
     const interactive = el.matches(INTERACTIVE);
-    if (!interactive && !forced) {
-      if (!TEXT_TAGS.has(el.tagName) || textCount >= opts.maxText) continue;
+    if (!interactive) {
+      // `only` mode applies the same text-element rules (minus the count cap): a click on an
+      // empty frame area / layout cell describes nothing.
+      if (!TEXT_TAGS.has(el.tagName) || (!forced && textCount >= opts.maxText)) continue;
       const own = ownText(el);
       if (!own || own.length > MAX_OWN) continue;
       if (el.parentElement && el.parentElement.closest(INTERACTIVE)) continue;

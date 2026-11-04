@@ -6,6 +6,9 @@ with the SAME logic as dom_scan.js (it embeds the scan and calls it with `only: 
 reports through `context.expose_binding("__cuaHuman")`. Frame navigations come from
 Playwright's framenavigated event, as path only.
 
+Clicks that land on neither an interactive element nor a named text element (an empty frame
+area) are not actions; they are only counted (`InterventionRequest.ignored_clicks`).
+
 Values: the script never sends the value of a password field, or of a field whose label is
 sensitive (Python decides the label part). Other values pass through the Redactor before they
 are stored. Capture is a no-op unless the control state is HUMAN.
@@ -64,13 +67,15 @@ class HumanCapture:
     event). `active()` gates everything: nothing is recorded unless a human holds control."""
 
     def __init__(self, surface: Any, redactor: Any, classify: Callable[[str, str, str], str],
-                 active: Callable[[], bool], operator: Callable[[], str], sink: Sink):
+                 active: Callable[[], bool], operator: Callable[[], str], sink: Sink,
+                 on_ignored: Callable[[], None] = lambda: None):
         self.surface = surface  # PlaywrightSurface (raw: capture must not go through policy)
         self.redactor = redactor
         self.classify = classify  # (role, name, frame_key) -> risk
         self.active = active
         self.operator = operator
         self.sink = sink
+        self.on_ignored = on_ignored  # a click that landed on nothing nameable
         self._seq = 0
         self._installed = False
 
@@ -113,6 +118,9 @@ class HumanCapture:
         label = el.get("label") or el.get("name") or ""
         kind = payload.get("type")
         if kind == "click":
+            if not el.get("name"):  # empty frame area / layout cell: noise, only counted
+                self.on_ignored()
+                return
             risk = self.classify(role or "", el.get("name") or "", frame)
             self._emit(type="click", frame=frame, role=role, name=name, risk=risk,
                        human_irreversible=risk == "irreversible")

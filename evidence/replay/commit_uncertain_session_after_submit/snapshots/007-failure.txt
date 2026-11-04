@@ -1,0 +1,21 @@
+== frame top /top "LAKESHORE MUTUAL CREDIT UNION - BANNER" ==
+[e1] text "LAKESHORE MUTUAL CREDIT UNION" frame=top
+[e2] text "MERIDIAN CORE v4.2.1 - SERVICING CONSOLE" frame=top
+[e3] cell "OPERATOR: |" frame=top
+[e4] text "[REDACTED:SECRET]" frame=top
+[e5] link "SIGN OFF" frame=top
+-- text (top) --
+LAKESHORE MUTUAL CREDIT UNION MERIDIAN CORE v4.2.1 - SERVICING CONSOLE OPERATOR: [REDACTED:SECRET] | SIGN OFF
+== frame nav /nav "LAKESHORE MUTUAL CREDIT UNION - MENU" ==
+[e6] text "FUNCTIONS" frame=nav
+[e7] button "MEMBER INQUIRY" frame=nav
+[e8] link "OPEN SUB-ACCOUNT" frame=nav
+[e9] text "REPORTS" frame=nav
+[e10] text "(N/A)" frame=nav
+-- text (nav) --
+FUNCTIONS » MEMBER INQUIRY » OPEN SUB-ACCOUNT » REPORTS (N/A)
+== frame main /subacct/submit "LAKESHORE MUTUAL CREDIT UNION - SESSION EXPIRED" ==
+[e11] text "SESSION EXPIRED — PLEASE SIGN ON AGAIN" frame=main
+[e12] link "RETURN TO SIGN ON" frame=main
+-- text (main) --
+SESSION EXPIRED — PLEASE SIGN ON AGAIN RETURN TO SIGN ON

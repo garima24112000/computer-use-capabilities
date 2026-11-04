@@ -1,0 +1,21 @@
+{
+  "actions_executed": 5,
+  "artifact_path": "capabilities/meridian.member.read_savings_balance/1.0.0.json",
+  "lint_errors": [],
+  "outcome": null,
+  "outputs": {
+    "savings_balance": "12345.67"
+  },
+  "reason": null,
+  "recorded_steps": 5,
+  "rejected_path": null,
+  "run_dir": "runs/20261103T171959Z-7374a1",
+  "run_id": "20261103T171959Z-7374a1",
+  "status": "completed",
+  "turns": 6,
+  "usage": {
+    "input_tokens": 17528,
+    "output_tokens": 446
+  },
+  "wall_s": 10.88
+}

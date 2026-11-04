@@ -1,0 +1,111 @@
+{
+  "capability": {
+    "approved": true,
+    "content_hash": "sha256:52a72ca413bc30b1fd03ccccf237b2101ed106a7ed43467cbc4d5ff914568f4a",
+    "id": "meridian.member.read_savings_balance",
+    "version": "1.1.0"
+  },
+  "drift": [
+    {
+      "degraded": true,
+      "step_id": "s02_fill_member_no",
+      "structural_only": true,
+      "winning_index": 2,
+      "winning_strategy_kind": "css_path"
+    },
+    {
+      "degraded": true,
+      "step_id": "s03_click_inquire",
+      "structural_only": true,
+      "winning_index": 3,
+      "winning_strategy_kind": "css_path"
+    }
+  ],
+  "duration_ms": 2872.1,
+  "evidence_dir": ".",
+  "failure": {
+    "category": "structural_only_on_risky",
+    "escalation": {
+      "action": "stop",
+      "human_action_count": 0,
+      "human_action_summaries": [],
+      "human_irreversible": false,
+      "intervention_id": null,
+      "note": null,
+      "operator": null,
+      "resolution": null
+    },
+    "evidence": {
+      "screenshot": "screenshots/003-failure-structural-only-on-risky.png",
+      "snapshot": "snapshots/003-failure.txt"
+    },
+    "expected": "a semantic locator for risky step 'link \"INQUIRE\" (label MEMBER NO.) in section MEMBER INQUIRY [frame main]'",
+    "observed": "only the structural css_path matched; refusing to act on structure alone",
+    "resolve_attempts": [
+      {
+        "kind": "role_name",
+        "match_count": 0,
+        "note": "",
+        "outcome": "not_found"
+      },
+      {
+        "kind": "label_anchor",
+        "match_count": 0,
+        "note": "",
+        "outcome": "not_found"
+      },
+      {
+        "kind": "text_match",
+        "match_count": 0,
+        "note": "",
+        "outcome": "not_found"
+      },
+      {
+        "kind": "css_path",
+        "match_count": 1,
+        "note": "",
+        "outcome": "matched"
+      }
+    ],
+    "retryable": false,
+    "step_id": "s03_click_inquire"
+  },
+  "inputs": {
+    "member_id": "12345"
+  },
+  "irreversible_executed": [],
+  "irreversible_executed_by_human": false,
+  "outcome": null,
+  "outputs": null,
+  "recoveries": [],
+  "run_id": "20261104T055556Z-6b1c7a",
+  "started_at": "2026-11-04T05:55:56.168709Z",
+  "status": "failed",
+  "steps": [
+    {
+      "duration_ms": 508.1,
+      "status": "ok",
+      "step_id": "s01_click_member_inquiry"
+    },
+    {
+      "duration_ms": 434.1,
+      "status": "ok",
+      "step_id": "s02_fill_member_no"
+    },
+    {
+      "duration_ms": 0.0,
+      "status": "failed",
+      "step_id": "s03_click_inquire"
+    },
+    {
+      "duration_ms": 0.0,
+      "status": "not_run",
+      "step_id": "s04_click_name"
+    },
+    {
+      "duration_ms": 0.0,
+      "status": "not_run",
+      "step_id": "s05_extract_savings_balance"
+    }
+  ]
+}

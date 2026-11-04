@@ -1,0 +1,13 @@
+{
+  "run_id": "20261103T171959Z-7374a1",
+  "kind": "discovery",
+  "started_at": "2026-11-03T17:19:59.917862Z",
+  "finished_at": "2026-11-03T17:20:12.270260Z",
+  "status": "completed",
+  "capability": "meridian.member.read_savings_balance",
+  "goal": "Look up member 12345 and read their Share Savings balance",
+  "tenant": "a",
+  "model_id": "us.anthropic.claude-sonnet-4-6",
+  "git_commit": "24f5e6ea24dd143f1b45a4e5c835183f3ff699bc",
+  "trace_enabled": false
+}

@@ -68,6 +68,10 @@ def test_replay_handoff_resume_continues_with_same_session(app_a, tmp_path, cons
     cookies_during = cookie_digest(raw)
     banner = h.top.evaluate("() => document.querySelector('[data-cua-ignore]')?.textContent")
     assert banner.startswith("HUMAN IN CONTROL - alice")
+    for frame in (h.main, h.top, h.main):  # clicks on empty frame areas: noise, not actions
+        frame.dispatch_event("body", "click")
+    wait_for(lambda: console.get(iv["id"])["ignored_clicks"] == 3, 20, "ignored clicks")
+    assert console.get(iv["id"])["human_actions"] == []
     redo_lookup_as_human(h)
     wait_for(lambda: len(console.get(iv["id"])["human_actions"]) >= 6, 20, "human actions")
     wait_for(lambda: (Path(iv["run_dir"]) / "live.png").exists(), 10, "live.png")
@@ -92,6 +96,7 @@ def test_replay_handoff_resume_continues_with_same_session(app_a, tmp_path, cons
     kinds = [a["type"] for a in final["human_actions"]]
     assert kinds.count("click") >= 3 and "input" in kinds and "navigate" in kinds
     clicks = [a for a in final["human_actions"] if a["type"] == "click"]
+    assert all(a["name"] for a in clicks) and final["ignored_clicks"] == 3
     assert any(a["name"] == "INQUIRE" and a["role"] == "link" for a in clicks)
     assert any(a["name"] == "[REDACTED:NAME]" for a in clicks)  # the member's name: redacted
     typed = next(a for a in final["human_actions"] if a["type"] == "input")

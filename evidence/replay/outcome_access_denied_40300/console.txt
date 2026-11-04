@@ -1,0 +1,5 @@
+BUSINESS_OUTCOME  meridian.member.read_savings_balance v1.1.0  (approved)  3264 ms  run 20261104T055506Z-ed8e39
+  outcome ACCESS_DENIED (access_denied): Access denied for this member (code 403-R).
+  evidence dir: .
+
+[exit code 10]
