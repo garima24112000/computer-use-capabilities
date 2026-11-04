@@ -216,6 +216,10 @@ def test_escalator_resume_reverifies_the_step(app_a, tmp_path):
     engine, logger = _engine(tmp_path, app_a, esc)
     r = engine.run(cap, M, profile=AppProfile.load_named("meridian-core"))
     logger.close()
-    # Nobody actually fixed the page, so re-verification of the step's expect fails.
-    assert r.status == "failed" and r.failure.category == "checkpoint_failed"
-    assert "after operator resume" in r.failure.observed
+    # Nobody actually fixed the page: verification fails, the engine escalates once more
+    # (round 2), that resume fails too, and the run fails (resume protocol, step 7).
+    assert r.status == "failed" and r.failure.category == "app_error"
+    assert "after 2 operator rounds" in r.failure.observed
+    assert len(esc.requests) == 2
+    assert "resume verification failed (round 1)" in esc.requests[1].reason
+    assert [x.kind for x in r.recoveries] == ["human_intervention"] * 2

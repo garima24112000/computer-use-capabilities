@@ -37,6 +37,12 @@ Recoveries (recorded in `recoveries`; the run still succeeded):
   allowed waiting again (no re-click, ever). Only for steps WITHOUT an `expect`.
 - settle_absorbed_by_checkpoint (id "slow_settle"): the page did not settle in time, but the
   step's `expect` checkpoint then held within its own timeout; the detail gives the ms waited.
+- human_intervention (id = intervention id): an operator took over the live session and
+  resumed; detail = operator, number of human actions, and the resume rule that applied:
+  success_checkpoint (only remaining Extract steps run), expect_holds (continue with the next
+  step), retry_step (target resolves semantically; step retried once). Steps the human
+  performed are reported with status "human". If the human did something policy classifies
+  as irreversible, `irreversible_executed_by_human` is true.
 
 Settle timeouts are never swallowed silently: with an `expect` the checkpoint decides (absorbed
 → recovery recorded; not holding → failed/settle_timeout); without one the retry policy decides
@@ -122,7 +128,7 @@ class Failure(BaseModel):
 
 class Recovery(BaseModel):
     kind: Literal["interstitial", "dialog", "session_relogin", "settle_retry",
-                  "settle_absorbed_by_checkpoint"]
+                  "settle_absorbed_by_checkpoint", "human_intervention"]
     id: str
     step_id: str | None = None
     detail: str = ""
@@ -138,7 +144,7 @@ class Drift(BaseModel):
 
 class StepRecord(BaseModel):
     step_id: str
-    status: Literal["ok", "failed", "not_run"]
+    status: Literal["ok", "failed", "not_run", "human"]  # human: done by an operator
     duration_ms: float = 0.0
 
 
@@ -153,6 +159,7 @@ class ReplayResult(BaseModel):
     drift: list[Drift] = Field(default_factory=list)
     steps: list[StepRecord] = Field(default_factory=list)
     irreversible_executed: list[str] = Field(default_factory=list)
+    irreversible_executed_by_human: bool = False
     run_id: str
     evidence_dir: str
     started_at: datetime

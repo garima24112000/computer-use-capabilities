@@ -5,8 +5,8 @@ typed, versioned capability artifact, and that artifact is replayed deterministi
 in the loop. The project also includes human-in-the-loop handoff and safety guardrails. See
 [CLAUDE.md](CLAUDE.md) for the project rules.
 
-> Status: target app, surface layer, guardrails, the capability artifact schema, LLM discovery and
-> deterministic replay are built. The HITL console comes next.
+> Status: target app, surface layer, guardrails, the capability artifact schema, LLM discovery,
+> deterministic replay and human-in-the-loop handoff are built.
 
 ## Install
 
@@ -81,6 +81,26 @@ uv run cua replay meridian.member.read_savings_balance --input member_id=12345 \
 Exit codes: 0 success, 10 business outcome, 20 failed, 30 escalated, 2 invalid invocation.
 Artifacts with irreversible steps replay only after `cua artifact approve`. Every run writes
 `runs/<run_id>/result.json` (the typed `ReplayResult`), events and masked step screenshots.
+
+## Human-in-the-loop handoff
+
+```bash
+uv run cua operator                      # terminal 1: console on http://127.0.0.1:8700/
+uv run cua replay meridian.member.read_savings_balance --input member_id=12345 --hitl \
+  --inject-at s04_click_name '{"http500_count": 1, "http500_path_prefix": "/member"}'
+uv run cua discover ... --hitl --approve-mode console   # escalations + approvals in the console
+uv run cua interventions list --status open
+```
+
+With `--hitl` a failure pauses automation and opens an intervention. An operator clicks **Take
+control** and works in the SAME browser (the headed window, or DevTools attached to the
+localhost CDP port). Their clicks and edits are captured (redacted), and **Resume** hands
+control back. Replay then verifies the page before continuing. One owner at a time is
+enforced by a control lease that GuardedSurface checks before every automation action.
+
+Security: the console binds 127.0.0.1 and has no authentication. The CDP port is full control
+of the browser, localhost only. A production deployment needs SSO, per-operator authorization,
+an audit trail and an authenticated, proxied screencast instead of raw CDP.
 
 ## Capability artifacts
 

@@ -204,7 +204,10 @@ def discover(
     start_app: Annotated[bool, typer.Option(
         help="start the target app in the background on a free port")] = True,
     base_url: Annotated[str | None, typer.Option(help="target app URL (--no-start-app)")] = None,
-    approve_mode: Annotated[str, typer.Option(help="prompt | deny")] = "prompt",
+    approve_mode: Annotated[str, typer.Option(help="prompt | deny | console")] = "prompt",
+    hitl: Annotated[bool, typer.Option(
+        help="escalate to the operator console (`cua operator`); headed + localhost CDP")
+    ] = False,
     llm: Annotated[str, typer.Option(help="bedrock | scripted:<path>")] = "bedrock",
     trace: Annotated[bool, typer.Option(help="record a Playwright trace (UNMASKED DOM)")] = False,
     runs_dir: Annotated[Path, typer.Option(help="where run evidence goes")] = Path("runs"),
@@ -246,8 +249,8 @@ def discover(
         raise _usage_error(str(exc)) from None
     except ValueError as exc:
         raise _usage_error(str(exc)) from None
-    if approve_mode not in ("prompt", "deny"):
-        raise _usage_error("--approve-mode must be prompt or deny")
+    if approve_mode not in ("prompt", "deny", "console"):
+        raise _usage_error("--approve-mode must be prompt, deny or console")
     if not start_app and not base_url:
         raise _usage_error("--no-start-app needs --base-url")
     if missing := missing_secrets():
@@ -265,6 +268,8 @@ def discover(
             raise
         raise _usage_error(f"LLM setup failed: {type(exc).__name__}: {exc}") from None
     approver = TerminalApprover() if approve_mode == "prompt" else DenyAllApprover()
+    if hitl or approve_mode == "console":
+        _hitl_banner(runs_dir)
 
     # --- 2. run (side effects from here on) ------------------------------------------------
     try:
@@ -276,8 +281,10 @@ def discover(
                               tenant=tenant, base_url=url)
             result = run_discovery(g, client, approver,
                                    config=DiscoveryConfig(max_steps=max_steps),
-                                   headless=not headed, trace=trace, runs_root=runs_dir,
-                                   capabilities_root=capabilities_dir or store.CAPABILITIES_DIR)
+                                   headless=not (headed or hitl), trace=trace,
+                                   runs_root=runs_dir,
+                                   capabilities_root=capabilities_dir or store.CAPABILITIES_DIR,
+                                   hitl=hitl, console_approval=approve_mode == "console")
     except Exception as exc:
         if debug:
             raise
@@ -369,7 +376,10 @@ def replay(
     start_app: Annotated[bool, typer.Option(
         help="start the target app in the background on a free port")] = True,
     base_url: Annotated[str | None, typer.Option(help="target app URL (--no-start-app)")] = None,
-    approve_mode: Annotated[str, typer.Option(help="deny | prompt")] = "deny",
+    approve_mode: Annotated[str, typer.Option(help="deny | prompt | console")] = "deny",
+    hitl: Annotated[bool, typer.Option(
+        help="escalate failures to the operator console (`cua operator`); headed + CDP")
+    ] = False,
     as_json: Annotated[bool, typer.Option("--json", help="print the ReplayResult JSON")] = False,
     repeat: Annotated[int, typer.Option(min=1, help="run N fresh replays; print stability")] = 1,
     inject: Annotated[str | None, typer.Option(
@@ -417,13 +427,15 @@ def replay(
                                              faults=json.loads(inject_at[1])))
     except (json.JSONDecodeError, ValueError) as exc:
         raise _usage_error(f"--inject/--inject-at: invalid JSON ({exc})") from None
-    if approve_mode not in ("deny", "prompt"):
-        raise _usage_error("--approve-mode must be deny or prompt")
+    if approve_mode not in ("deny", "prompt", "console"):
+        raise _usage_error("--approve-mode must be deny, prompt or console")
     if not start_app and not base_url:
         raise _usage_error("--no-start-app needs --base-url")
     if missing := AppProfile.load_named("meridian-core").missing_secrets():
         raise _usage_error(f"missing operator secrets in the environment: {missing}")
     approver = TerminalApprover() if approve_mode == "prompt" else DenyAllApprover()
+    if hitl or approve_mode == "console":
+        _hitl_banner(runs_dir)
     if injections:
         typer.echo("!" * 72, err=True)
         typer.echo(f"!!! FAULT INJECTED (harness): {[i.model_dump() for i in injections]}",
@@ -437,7 +449,8 @@ def replay(
         with app_ctx as url:
             for _ in range(repeat):
                 results.append(run_replay(path, values, base_url=url, tenant=tenant,
-                                          approver=approver, headless=not headed,
+                                          approver=approver, headless=not (headed or hitl),
+                                          hitl=hitl, console_approval=approve_mode == "console",
                                           runs_root=runs_dir, capabilities_root=caps_root,
                                           injections=injections, use_override=override))
     except Exception as exc:
@@ -456,6 +469,50 @@ def replay(
     if repeat > 1:
         _stability(results)
     raise typer.Exit(REPLAY_EXIT[last.status])
+
+
+def _hitl_banner(runs_dir: Path) -> None:
+    typer.echo(f"HITL: escalations go to the operator console. Start it with `cua operator "
+               f"--runs-dir {runs_dir}` and open http://127.0.0.1:8700/", err=True)
+
+
+@app.command()
+def operator(
+    port: Annotated[int, typer.Option(help="port (binds 127.0.0.1 only)")] = 8700,
+    runs_dir: Annotated[Path, typer.Option(help="runs dir holding _hitl/")] = Path("runs"),
+) -> None:
+    """Operator console for HITL interventions (localhost only, no auth: see docs)."""
+    import uvicorn
+
+    from cua.hitl.console import create_console
+    from cua.hitl.interventions import InterventionStore
+
+    store = InterventionStore(runs_dir / "_hitl" / "interventions.db")
+    typer.echo(f"operator console on http://127.0.0.1:{port}/ (store {store.path})")
+    uvicorn.run(create_console(store, runs_root=runs_dir), host="127.0.0.1", port=port,
+                log_level="warning")
+
+
+interventions_app = typer.Typer(help="Inspect HITL interventions.", no_args_is_help=True)
+app.add_typer(interventions_app, name="interventions")
+
+
+@interventions_app.command("list")
+def interventions_list(
+    status: Annotated[str | None, typer.Option(help="open|claimed|resolved|expired")] = None,
+    runs_dir: Annotated[Path, typer.Option(help="runs dir holding _hitl/")] = Path("runs"),
+) -> None:
+    """List interventions (newest first)."""
+    from cua.hitl.interventions import InterventionStore
+
+    store = InterventionStore(runs_dir / "_hitl" / "interventions.db")
+    rows = store.list(status)
+    if not rows:
+        typer.echo("no interventions")
+    for i in rows:
+        typer.echo(f"{i.id}  {i.status:8} {i.kind:18} {i.capability or i.goal or '-':45} "
+                   f"step={i.step_id or '-'} op={i.operator or '-'} "
+                   f"res={i.resolution or '-'} actions={len(i.human_actions)}")
 
 
 @profile_app.command("validate")

@@ -16,6 +16,13 @@ class EscalationRequest(BaseModel):
     step_id: str | None = None  # replay step
     category: str | None = None  # replay failure category
     evidence: dict[str, str] = Field(default_factory=dict)
+    # Context for a human (all redacted by the caller).
+    kind: str | None = None  # discovery_stuck | replay_failure | commit_uncertain
+    capability: str | None = None  # "id@version"
+    goal: str | None = None
+    step_intent: str | None = None
+    expected: str | None = None
+    observed: str | None = None
 
 
 class EscalationDecision(BaseModel):
@@ -25,6 +32,12 @@ class EscalationDecision(BaseModel):
     action: Literal["stop", "resumed", "handled"] = "stop"
     note: str | None = None
     resolution: str | None = None
+    # Filled by a HITL escalator.
+    intervention_id: str | None = None
+    operator: str | None = None
+    human_action_count: int = 0
+    human_action_summaries: list[str] = Field(default_factory=list)
+    human_irreversible: bool = False
 
     @property
     def resume(self) -> bool:

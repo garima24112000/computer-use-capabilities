@@ -1,5 +1,7 @@
 // Element enumeration for one frame. Evaluated by Playwright as `frame.evaluate(SCAN_JS, opts)`.
-// opts: {mode: "observe" | "resolve", start: int, maxText: int, maxFrameText: int}
+// opts: {mode: "observe" | "resolve", start: int, maxText: int, maxFrameText: int, only?: Element}
+//  - only: describe just this element (or its nearest interactive ancestor) with the same logic;
+//    used by human-action capture. Elements inside [data-cua-ignore] (our banner) are skipped.
 //  - observe: clears and reassigns sequential `data-cua-ref` attributes (e<start+1>...).
 //  - resolve: leaves `data-cua-ref` untouched (so the last observation's refs stay valid).
 // Every scanned element also gets a stable per-document `data-cua-tmp` handle that Python uses to
@@ -218,11 +220,15 @@
   const out = [];
   let seq = opts.start || 0;
   let textCount = 0;
-  for (const el of document.querySelectorAll('*')) {
+  const forced = !!opts.only;
+  const pool = forced ? [opts.only.closest(INTERACTIVE) || opts.only]
+                      : document.querySelectorAll('*');
+  for (const el of pool) {
     if (SKIP_TAGS.has(el.tagName)) continue;
+    if (el.closest('[data-cua-ignore]')) continue;
     if (el.closest('select, script, style, noscript')  && el.tagName !== 'SELECT') continue;
     const interactive = el.matches(INTERACTIVE);
-    if (!interactive) {
+    if (!interactive && !forced) {
       if (!TEXT_TAGS.has(el.tagName) || textCount >= opts.maxText) continue;
       const own = ownText(el);
       if (!own || own.length > MAX_OWN) continue;
@@ -263,11 +269,16 @@
     });
   }
   const root = document.body || document.documentElement;
+  let text = norm(root ? root.innerText : '');
+  for (const b of document.querySelectorAll('[data-cua-ignore]')) {
+    const t = norm(b.innerText);
+    if (t) text = norm(text.replace(t, ' '));
+  }
   return {
     elements: out,
     next: seq,
     title: document.title || '',
     has_focus: document.hasFocus(),
-    text: norm(root ? root.innerText : '').slice(0, opts.maxFrameText),
+    text: text.slice(0, opts.maxFrameText),
   };
 }

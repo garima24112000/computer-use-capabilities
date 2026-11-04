@@ -25,7 +25,7 @@ from cua.policy.redaction import (
 )
 from cua.surface.base import Surface, Target
 from cua.surface.errors import ActionFailed, SurfaceError, TargetNotFound
-from cua.surface.locators import CssPath, TargetSpec
+from cua.surface.locators import CssPath, RoleName, TargetSpec
 from cua.surface.models import (
     TOP_FRAME_KEY,
     ActionResult,
@@ -108,6 +108,8 @@ class GuardedSurface(Surface):
         # Decision for the most recent action that passed authorization and was dispatched to
         # the inner surface (even if it then failed): lets callers tell "maybe executed" apart.
         self.last_dispatched: PolicyDecision | None = None
+        # HITL: a ControlSession whose lease must be held by automation before ANY action.
+        self.control = None
         if hasattr(inner, "set_request_filter"):
             inner.set_request_filter(lambda url: guard.url_decision(url) is None,
                                      self._on_network_blocked)
@@ -224,6 +226,8 @@ class GuardedSurface(Surface):
         summary = self._summary(action, info, target)
         decision = (decide or self._decide)(action, info, ctx)
         self._authorize(decision, summary, ctx)
+        if self.control is not None:
+            self.control.require_automation(summary)  # raises ControlNotHeld; nothing sent
         self.last_dispatched = decision
         try:
             result = run(info)
@@ -253,6 +257,8 @@ class GuardedSurface(Surface):
         actor = self._actor(ctx)
         decision = self.guard.check_navigation(url, ctx)
         self._authorize(decision, f"navigate {url}", ctx)
+        if self.control is not None:
+            self.control.require_automation(f"navigate {url}")
         try:
             self.inner.open(url)
         except SurfaceError as exc:
@@ -375,6 +381,13 @@ class GuardedSurface(Surface):
         raw = self._observe_raw()
         self.redactor.redact_observation(raw, self.labels)  # registers newly seen values
         masks = sensitive_mask_targets(raw, self.labels) + list(mask_targets or [])
+        # Also paint over any element whose text contains a value the redactor knows is secret
+        # or sensitive (e.g. the operator id echoed upper-cased in the app's banner).
+        for el in raw.elements:
+            if el.name and self.redactor.redact_text(el.name) != el.name \
+                    and not element_sensitivity(el, self.redactor.labels):
+                masks.append(TargetSpec(frame=el.frame, description="mask known value",
+                                        strategies=[RoleName(role=el.role, name=el.name)]))
         return self.inner.screenshot(path, fail_closed_masks(self.inner, masks))
 
     def current_urls(self) -> dict[str, str]:

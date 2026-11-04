@@ -51,7 +51,12 @@ QUIET_JS = """() => {
   if (!window.__cuaMut) {
     window.__cuaMut = {last: 0};  // quiet clock starts at document start
     new MutationObserver((recs) => {
-      const ours = (r) => r.type === 'attributes' && /^data-cua-/.test(r.attributeName || '');
+      const ign = (n) => n && n.nodeType === 1 && n.closest && n.closest('[data-cua-ignore]');
+      const ours = (r) => (r.type === 'attributes' && /^data-cua-/.test(r.attributeName || ''))
+        || ign(r.target) || ign(r.target && r.target.parentElement)
+        || (r.type === 'childList' && [...r.addedNodes, ...r.removedNodes].length > 0
+            && [...r.addedNodes, ...r.removedNodes].every(
+              (n) => n.nodeType === 1 && n.hasAttribute && n.hasAttribute('data-cua-ignore')));
       if (recs.some((r) => !ours(r))) window.__cuaMut.last = performance.now();
     }).observe(document, {subtree: true, childList: true, attributes: true, characterData: true});
   }
@@ -59,8 +64,14 @@ QUIET_JS = """() => {
 }"""
 
 TEXT_JS = """() => {
+  const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim();
   const r = document.body || document.documentElement;
-  return r ? r.innerText.replace(/\\s+/g, ' ').trim() : '';
+  let text = norm(r ? r.innerText : '');
+  for (const b of document.querySelectorAll('[data-cua-ignore]')) {  // our HITL banner
+    const t = norm(b.innerText);
+    if (t) text = norm(text.replace(t, ' '));
+  }
+  return text;
 }"""
 
 CSS_JS = """(sel) => Array.from(document.querySelectorAll(sel)).map((el) => {
@@ -114,6 +125,7 @@ class PlaywrightSurface(Surface):
         max_frame_text: int = 4000,
         request_filter: RequestFilter | None = None,
         on_request_blocked: BlockedCallback | None = None,
+        cdp_port: int | None = None,
     ):
         self.headless = headless
         self.slow_mo = slow_mo
@@ -131,6 +143,10 @@ class PlaywrightSurface(Surface):
         self.dialog_policy_name = dialog_policy_name
         self.max_text_elements = max_text_elements
         self.max_frame_text = max_frame_text
+        # HITL live access: Chrome DevTools Protocol on 127.0.0.1 only. CDP is FULL control of
+        # the browser (and its cookies); never expose it beyond localhost. Production would use
+        # an authenticated, proxied screencast instead.
+        self.cdp_port = cdp_port
 
         self._pw: Playwright | None = None
         self._browser: Browser | None = None
@@ -156,7 +172,12 @@ class PlaywrightSurface(Surface):
             )
             self._page = self._context.pages[0] if self._context.pages else self._context.new_page()
         else:
-            self._browser = self._pw.chromium.launch(headless=self.headless, slow_mo=self.slow_mo)
+            args = []
+            if self.cdp_port:
+                args = [f"--remote-debugging-port={self.cdp_port}",
+                        "--remote-debugging-address=127.0.0.1"]
+            self._browser = self._pw.chromium.launch(headless=self.headless, slow_mo=self.slow_mo,
+                                                     args=args)
             self._context = self._browser.new_context(viewport=viewport)
             self._page = self._context.new_page()
         self._context.set_default_timeout(self.default_timeout_ms)
@@ -170,6 +191,16 @@ class PlaywrightSurface(Surface):
         page.on("requestfinished", self._on_request_done)
         page.on("requestfailed", self._on_request_done)
         page.on("framenavigated", self._on_frame_navigated)
+
+    @property
+    def cdp_url(self) -> str | None:
+        return f"http://127.0.0.1:{self.cdp_port}" if self.cdp_port else None
+
+    def frame_key(self, frame: Frame) -> str:
+        return self._frame_ref(frame).key
+
+    def frames(self) -> list[Frame]:
+        return self._frames()
 
     @property
     def context(self) -> BrowserContext:

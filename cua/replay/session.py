@@ -14,9 +14,11 @@ from cua.artifact import store
 from cua.artifact.overrides import TenantOverride
 from cua.artifact.profile import PROFILES_DIR, AppProfile
 from cua.hitl.escalation import Escalator
+from cua.hitl.hitl import HitlApprover, HitlEscalator, HitlSession
+from cua.hitl.interventions import InterventionStore
 from cua.obs.events import EventLogger
 from cua.obs.run import RunContext
-from cua.policy.guard import Approver
+from cua.policy.guard import Approver, PolicyGuard
 from cua.policy.models import DEFAULT_POLICY_PATH, PolicyConfig
 from cua.policy.redaction import Redactor
 from cua.replay.engine import ReplayEngine
@@ -30,6 +32,7 @@ from cua.replay.result import (
 )
 from cua.surface.base import DialogPolicy
 from cua.surface.web import PlaywrightSurface
+from target_app.background import free_port
 
 _SEMVER = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 
@@ -73,7 +76,14 @@ def run_replay(
     injections: list[FaultInjection] | None = None,
     trace: bool = False,
     use_override: bool = True,
+    hitl: bool = False,
+    console_approval: bool = False,
+    hitl_store: "InterventionStore | None" = None,
+    hitl_timeout_s: float = 15 * 60,
+    approval_timeout_s: float = 10 * 60,
 ) -> ReplayResult:
+    """`hitl`: escalations go to the operator console (HitlEscalator) and the browser gets a
+    localhost CDP port for live access. `console_approval`: approvals via the console."""
     policy = PolicyConfig.load(policy_path)
     redactor = Redactor(policy.sensitive_labels)
     path = resolve_artifact(str(artifact), capabilities_root)
@@ -97,9 +107,20 @@ def run_replay(
             if (inj := at_step.pop(step_id, None)) is not None:  # once, even across restarts
                 inject(base_url, inj, run, logger)
 
+        if hitl or console_approval:
+            session = HitlSession(hitl_store or InterventionStore(Path(runs_root) / "_hitl" /
+                                                                  "interventions.db"),
+                                  run, logger, redactor, PolicyGuard(policy),
+                                  headed=not headless)
+            if hitl:
+                escalator = HitlEscalator(session, hitl_timeout_s)
+            if console_approval:
+                approver = HitlApprover(session, approval_timeout_s)
+
         def factory(dialog_policy: DialogPolicy, name: str) -> PlaywrightSurface:
             surface = PlaywrightSurface(headless=headless, dialog_policy=dialog_policy,
-                                        dialog_policy_name=name)
+                                        dialog_policy_name=name,
+                                        cdp_port=free_port() if hitl else None)
             surface.start()
             run.start_trace(surface)
             return surface

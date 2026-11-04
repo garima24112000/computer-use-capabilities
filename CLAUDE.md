@@ -68,6 +68,17 @@ against.
   retried, and session loss after one is `session_expired_after_commit` (no re-login).
 - The Escalator protocol lives in `cua/hitl/escalation.py`, shared by discovery and replay.
 
+## HITL (built)
+
+- `cua/hitl/`: `control.py` (state machine + lease + banner), `interventions.py` (SQLite WAL
+  store, compare-and-set), `capture.py` (init script + binding, same scan logic), `hitl.py`
+  (HitlSession, HitlEscalator, HitlApprover), `console.py` (FastAPI, 127.0.0.1, no auth).
+- GuardedSurface refuses every automation action unless automation holds the lease
+  (`ControlNotHeld`). The handoff never creates a new context/page (tested by cookie + ids).
+- The run thread waits with `page.wait_for_timeout`, never `time.sleep`, so capture callbacks
+  are dispatched. Human actions are evidence only, never artifact steps.
+- Anything marked `data-cua-ignore` (the banner) is invisible to the DOM scan and frame text.
+
 ## Conventions
 
 - Python 3.11, managed with `uv`. Use the Playwright **sync** API everywhere.

@@ -215,6 +215,9 @@ class ReplayEngine:
         inner = self.surface_factory(profile_dialog_policy(profile), f"profile:{profile.id}")
         self.gs = GuardedSurface(inner, PolicyGuard(self.policy), self._ctx, self.log,
                                  approver=self.approver, redactor=self.redactor)
+        for hook in (self.escalator, self.approver):  # HITL needs the live session
+            if hasattr(hook, "attach"):
+                hook.attach(self.gs)
         self.evidence = EvidenceCapture(self.gs, self.run_ctx, self.redactor, self.policy,
                                         self.log, actor="replay")
         self._step_id = "login"
@@ -253,10 +256,16 @@ class ReplayEngine:
 
     def _steps(self) -> None:
         self.outputs: dict[str, Any] = {}
+        self._extract_only = False
         self.result.steps = [StepRecord(step_id=s.id, status="not_run") for s in self.cap.steps]
+        retried: set[str] = set()
         i = 0
         while i < len(self.cap.steps):
             step = self.cap.steps[i]
+            if self._extract_only and not isinstance(step.action, Extract):
+                self.result.steps[i].status = "human"  # the operator already got past it
+                i += 1
+                continue
             try:
                 self._run_step(step, i)
             except _Restart:
@@ -267,21 +276,60 @@ class ReplayEngine:
                 continue
             except _Fail as f:
                 self.result.steps[i].status = "failed"
-                decision = self._failed(f, escalate=True)
-                if decision is None or not decision.resume:
-                    raise _Handled() from None
-                check = check_checkpoint(self.gs, step.expect, self.inputs) \
-                    if step.expect else None
-                if check is not None and not check.ok:
-                    self._failed(_Fail(FailureCategory.checkpoint_failed, step.id,
-                                       step.expect.description,
-                                       f"after operator resume: {check.failures()}"),
-                                 escalate=False)
-                    raise _Handled() from None
-                self.result.status = "failed"
-                self.result.failure = None
-                self.result.steps[i].status = "ok"
+                i = self._escalate_and_resume(f, step, i, retried)
+                continue
             i += 1
+
+    def _escalate_and_resume(self, f: _Fail, step: Step, i: int, retried: set[str]) -> int:
+        """Escalate a step failure. On `resumed`, verify what the human left behind (max 2
+        rounds) and return the index to continue from; otherwise stop the run."""
+        for round_ in (1, 2):
+            decision = self._failed(f, escalate=True)
+            if decision is None or not decision.resume:
+                raise _Handled()
+            rule, next_i = self._verify_resume(step, i, retried)
+            self._recovery("human_intervention", decision.intervention_id or "operator",
+                           step.id, f"operator {decision.operator or '?'}; "
+                           f"{decision.human_action_count} human action(s); "
+                           f"round {round_}; rule {rule or 'none (verification failed)'}")
+            if decision.human_irreversible:
+                self.result.irreversible_executed_by_human = True
+            if rule is not None:
+                if hasattr(self.escalator, "resume_verified"):
+                    self.escalator.resume_verified(True, rule)
+                self.result.status, self.result.failure = "failed", None
+                return next_i
+            f = _Fail(f.category, step.id, f.expected,
+                      f"resume verification failed (round {round_}): {self._observed()}")
+        self._failed(_Fail(f.category, step.id, f.expected,
+                           "resume verification failed after 2 operator rounds"),
+                     escalate=False)
+        raise _Handled()
+
+    def _verify_resume(self, step: Step, i: int, retried: set[str]) -> tuple[str | None, int]:
+        """The human says "resume". Check, in order, what state the app is really in."""
+        self._step_id = step.id
+        try:
+            self._sweep(step)  # dialogs/interstitials/outcomes on the human's page
+        except _Fail:
+            return None, i
+        if check_checkpoint(self.gs, self.cap.success, self.inputs).ok:
+            self._extract_only = True  # (1) already at the end: just read the outputs
+            return "success_checkpoint", i
+        if step.expect is not None and check_checkpoint(self.gs, step.expect, self.inputs).ok:
+            self.result.steps[i].status = "human"  # (2) the human did this step
+            return "expect_holds", i + 1
+        target = getattr(step.action, "target", None)
+        if target is not None and step.risk != "irreversible" and step.id not in retried:
+            try:
+                _, rr = self.gs.resolve(target.bind(self.inputs))
+                semantic = target.strategies[rr.winning_strategy_index or 0].kind != "css_path"
+            except (TargetNotFound, SurfaceError):
+                semantic = False
+            if semantic:
+                retried.add(step.id)  # (3) the page is back where the step can run: once
+                return "retry_step", i
+        return None, i
 
     def _run_step(self, step: Step, index: int) -> None:
         self._step_id, self._step_approved = step.id, step.approved
@@ -581,10 +629,18 @@ class ReplayEngine:
             failure.evidence = Evidence(**refs)
         except Exception:
             pass
+        step = next((s for s in getattr(self, "cap", None).steps if s.id == f.step_id), None) \
+            if getattr(self, "cap", None) else None
         decision = self.escalator.escalate(EscalationRequest(
             reason=f"{f.category}: {failure.expected} / {failure.observed}", raised_by="replay",
             run_id=self.run_ctx.run_id, step_id=f.step_id, category=str(f.category),
-            evidence=failure.evidence.model_dump(exclude_none=True)))
+            evidence=failure.evidence.model_dump(exclude_none=True),
+            kind="commit_uncertain" if f.category == FailureCategory.session_expired_after_commit
+            else "replay_failure",
+            capability=f"{self.result.capability.id}@{self.result.capability.version}",
+            step_intent=self.redactor.redact_text(render(step.intent, self.inputs))
+            if step else None,
+            expected=failure.expected, observed=failure.observed))
         failure.escalation = decision.model_dump()
         self.log.emit("escalation", "replay", f.step_id, action=decision.action,
                       note=decision.note, resolution=decision.resolution)

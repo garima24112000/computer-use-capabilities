@@ -114,6 +114,9 @@ class DiscoveryAgent:
         self.redactor = surface.redactor
         self._ctx = PolicyContext(mode="discovery", run_id=self.run_ctx.run_id)
         surface.ctx_provider = lambda: self._ctx  # the agent owns the policy context
+        for hook in (self.escalator, surface.approver):  # HITL needs the live session
+            if hasattr(hook, "attach"):
+                hook.attach(surface)
         self._recoveries: dict[str, int] = {}
         self.usage = Usage()
 
@@ -257,11 +260,14 @@ class DiscoveryAgent:
         refs = self._capture_failure("escalation")
         self.log.emit("escalation", stop.raised_by, self._ctx.step_id, reason=stop.reason,
                       evidence=refs)
+        goal = self.recorder.goal
         decision = self.escalator.escalate(EscalationRequest(
             reason=stop.reason or "escalated", raised_by=stop.raised_by,
-            run_id=self.run_ctx.run_id, turn=result.turns, evidence=refs))
-        self.log.emit("human_action" if decision.resume else "escalation", "system",
-                      self._ctx.step_id, resume=decision.resume, note=decision.note)
+            run_id=self.run_ctx.run_id, turn=result.turns, evidence=refs,
+            kind="discovery_stuck", capability=goal.capability_id,
+            goal=self.redactor.redact_text(goal.goal), step_id=self._ctx.step_id))
+        self.log.emit("escalation", "system", self._ctx.step_id, action=decision.action,
+                      note=decision.note, intervention=decision.intervention_id)
         return decision
 
     def _finish(self, result: DiscoveryResult) -> None:
@@ -297,7 +303,14 @@ class DiscoveryAgent:
                     raise
                 # An operator fixed things (step 7): reset the budgets and look again.
                 st.invalid = st.no_progress = 0
-                st.last_result = f"operator: {decision.note or 'resumed after escalation'}"
+                # Human actions are evidence only, never artifact steps (teaching by
+                # demonstration is a documented next step).
+                summaries = "; ".join(decision.human_action_summaries) or "no recorded actions"
+                st.last_result = self.redactor.redact_text(
+                    f"A human operator intervened ({decision.human_action_count} actions: "
+                    f"{summaries}). Continue from the current page.")
+                if hasattr(self.escalator, "resume_verified"):
+                    self.escalator.resume_verified(True, "discovery")
                 st.obs = self.surface.observe()
 
     def _turn(self, goal: DiscoveryGoal, result: DiscoveryResult, started: float,

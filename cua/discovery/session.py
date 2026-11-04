@@ -11,6 +11,8 @@ from cua.discovery.models import DiscoveryConfig, DiscoveryGoal, DiscoveryResult
 from cua.discovery.recorder import Recorder
 from cua.execute import profile_dialog_policy
 from cua.hitl.escalation import Escalator
+from cua.hitl.hitl import HitlApprover, HitlEscalator, HitlSession
+from cua.hitl.interventions import InterventionStore
 from cua.obs.events import EventLogger
 from cua.obs.evidence import EvidenceCapture
 from cua.obs.run import RunContext
@@ -20,6 +22,7 @@ from cua.policy.guarded_surface import GuardedSurface
 from cua.policy.models import DEFAULT_POLICY_PATH, PolicyConfig, PolicyContext
 from cua.policy.redaction import Redactor
 from cua.surface.web import PlaywrightSurface
+from target_app.background import free_port
 
 
 def run_discovery(
@@ -35,6 +38,11 @@ def run_discovery(
     profile_name: str = "meridian-core",
     policy_path: Path = DEFAULT_POLICY_PATH,
     trace: bool = False,
+    hitl: bool = False,
+    console_approval: bool = False,
+    hitl_store: InterventionStore | None = None,
+    hitl_timeout_s: float = 15 * 60,
+    approval_timeout_s: float = 10 * 60,
 ) -> DiscoveryResult:
     goal.contract()  # fail fast (ContractError) before any run dir, browser or LLM call
     policy = PolicyConfig.load(policy_path)
@@ -48,7 +56,16 @@ def run_discovery(
     logger = EventLogger(run, redactor)
     transcript = TranscriptWriter(run, redactor)
     inner = PlaywrightSurface(headless=headless, dialog_policy=profile_dialog_policy(profile),
-                              dialog_policy_name=f"profile:{profile.id}")
+                              dialog_policy_name=f"profile:{profile.id}",
+                              cdp_port=free_port() if hitl else None)
+    if hitl or console_approval:
+        session = HitlSession(hitl_store or InterventionStore(Path(runs_root) / "_hitl" /
+                                                              "interventions.db"),
+                              run, logger, redactor, PolicyGuard(policy), headed=not headless)
+        if hitl:
+            escalator = HitlEscalator(session, hitl_timeout_s)
+        if console_approval:
+            approver = HitlApprover(session, approval_timeout_s)
     try:
         inner.start()
         run.start_trace(inner)
