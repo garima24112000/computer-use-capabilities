@@ -68,6 +68,12 @@ against.
   retried, and session loss after one is `session_expired_after_commit` (no re-login).
 - The Escalator protocol lives in `cua/hitl/escalation.py`, shared by discovery and replay.
 
+## Catalog (built)
+
+- `cua/catalog.py` + `cua catalog list|invoke`: approved capabilities as agent tools
+  (`to_tool_definition()`). `invoke` validates args against `input_schema` + the contract
+  (exit 2 before any browser), then runs the shared replay path (`cli._replay_and_exit`).
+
 ## HITL (built)
 
 - `cua/hitl/`: `control.py` (state machine + lease + banner), `interventions.py` (SQLite WAL

@@ -11,6 +11,7 @@ waits with page.wait_for_timeout(), never time.sleep, so Playwright keeps dispat
 callbacks and navigation events from the live browser.
 """
 
+import contextlib
 import hashlib
 import time
 from collections.abc import Callable
@@ -206,10 +207,29 @@ class HitlEscalator:
         self.session.attach(guarded_surface)
 
     def escalate(self, request: EscalationRequest) -> EscalationDecision:
+        """Never raises once control has left AUTOMATION: an error while waiting for the operator
+        is logged (`escalation_error`), control ends DONE (aborted) and the decision is stop. A
+        raise here would make the caller escalate again from AWAITING_HUMAN and hide the error."""
         s = self.session
         ctl = s.control
         event = "verification_failed" if ctl.state == ControlState.RESUMING else "escalate"
         ctl.transition(event, "automation", request.reason)
+        try:
+            return self._escalate(request)
+        except Exception as exc:
+            detail = s.redactor.redact_text(f"{type(exc).__name__}: {exc}")
+            s.log.emit("escalation_error", "system", request.step_id, error=detail)
+            if s.current is not None:
+                with contextlib.suppress(Exception):
+                    s.store.expire(s.current.id)
+                s.current = None
+            if ctl.state in (ControlState.AWAITING_HUMAN, ControlState.HUMAN):
+                ctl.transition("aborted", "system", f"escalation failed: {detail}")
+            return EscalationDecision(action="stop", note=f"escalation failed: {detail}")
+
+    def _escalate(self, request: EscalationRequest) -> EscalationDecision:
+        s = self.session
+        ctl = s.control
         kind = request.kind or ("commit_uncertain"
                                 if request.category == "session_expired_after_commit"
                                 else "replay_failure" if request.raised_by == "replay"

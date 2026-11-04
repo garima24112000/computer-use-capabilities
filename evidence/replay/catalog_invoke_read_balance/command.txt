@@ -1,0 +1,1 @@
+uv run cua catalog invoke meridian_member_read_savings_balance --args '{"member_id": "12345"}' --no-start-app --base-url http://127.0.0.1:53797 --runs-dir runs/_evidence/catalog_invoke_read_balance

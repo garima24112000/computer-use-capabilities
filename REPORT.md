@@ -16,7 +16,8 @@ A computer-use system for legacy back-office apps that have no API. An LLM disco
               │ GuardedSurface: allowlist · risk tiers · approvals · redaction ·    │
               │                 control lease                                      │
               ├────────────────────────────────────────────────────────────────────┤
-              │ Surface interface: observe · describe · resolve · act · screenshot  │
+              │ Surface interface: observe · describe · resolve ·                  │
+              │                    click/fill/select/press · screenshot            │
               ├──────────────────────┬──────────────────────┬──────────────────────┤
               │ Playwright web (built)│ Desktop UIA/AX (design)│ Vision + OCR (design) │
               └──────────┬───────────┴──────────────────────┴──────────────────────┘
@@ -44,15 +45,15 @@ A capability is **a contract first and a step list second**. A calling agent rea
 | Steps | stable `id`, human `intent`, typed action (`Navigate`, `Click`, `Fill`, `Select`, `Press`, `Extract`; no free-form JS), `risk`, `requires_approval`/`approved`, `expect` checkpoint, retry, settle timeout | Reviewable line by line; every step verifies where it landed |
 | Targets | `TargetSpec` = frame + ordered strategies: RoleName → LabelAnchor → TableCell → TextMatch → CssPath | Semantic first, structural last (see §3) |
 | Success | final checkpoint | Success is asserted, not assumed |
-| Review | reviewer, `approved_at`, `approved_content_hash` | Approval is bound to the exact content |
+| Review | `reviewed_by`, `approved_at`, `approved_content_hash` | Approval is bound to the exact content |
 | Provenance | source (discovery / hand_written), run id, model, redacted goal, prompt/recorder version, transcript sha256, evidence dir | Traceable to the run without storing the transcript |
 
 **Deliberate constraints:**
 
 - **A tiny template grammar.** The only placeholders are `{{inputs.x}}` and `{{secret:NAME}}` (whole value, `Fill` only). There are no expressions, so artifacts are data, never code.
 - **One exception for parameterized targets.** The only locator field that may hold a template is `TableCell.row_key = {{inputs.member_id}}`. The result row is keyed by a declared, non-sensitive input, never by the member's name, which is PII. "First row" would silently pick the wrong member.
-- **Content hash and approval.** The hash covers everything functional and excludes status, review, provenance and approval flags. Approving records the hash, so any later edit voids the approval and replay refuses the irreversible steps.
-- **Lint reports every problem at once.** It checks that all inputs are declared and used, that each output is extracted exactly once, that irreversible steps require approval, and that no `TargetSpec` or checkpoint text contains sensitive values. For discovered artifacts it also requires every Extract step to have a non-structural strategy.
+- **Content hash and approval.** The hash covers everything functional and excludes status, review, provenance and approval flags. Approving records the hash, so any later functional edit voids the approval, and replay then refuses to run an artifact that has irreversible steps.
+- **Lint reports every problem at once.** It checks that every referenced input is declared and every required input is used, that each output is extracted exactly once, that irreversible steps require approval, and that no `TargetSpec` or checkpoint text contains sensitive values. For discovered artifacts it also requires every Extract step to have a non-structural strategy.
 - **App profile, separate from capabilities.** One profile per vendor product holds the login sub-flow, interstitials, known dialogs, session-expiry detection, error signatures, shared business outcomes (with `scope_paths`) and sensitive labels.
 
 ## 3. Determinism & error handling
@@ -82,7 +83,7 @@ There are 16 failure categories, each with a fixed `retryable` flag (`cua/replay
 
 ## 4. Heterogeneity & multi-tenant
 
-**Surface abstraction.** The recorded flow speaks in roles, accessible names, labels, table positions and frames, never in Playwright calls. The seam is the `Surface` interface (observe / describe / resolve / act / screenshot).
+**Surface abstraction.** The recorded flow speaks in roles, accessible names, labels, table positions and frames, never in Playwright calls. The seam is the `Surface` interface (observe / describe / resolve / click/fill/select/press / screenshot).
 
 - **Legacy web** is the implemented case: frames, tables and missing ids are handled by the scan.
 - **Desktop** would be a UIA/AX Surface, which exposes the same role/name/label tree. RoleName and LabelAnchor carry over unchanged, and `CssPath` is replaced by an automation-id or tree path.
@@ -134,17 +135,17 @@ The result records a `human_intervention` recovery: operator, action count and t
   - Login runs deterministically from the profile, so the LLM never sees or types credentials. Secrets are `{{secret:NAME}}` references, resolved at fill time and registered with the redactor (case-insensitive).
   - Redaction is layered: structural (cells next to labels like SSN, ADDRESS, NAME), regex (SSN, card with Luhn check, phone, email, long account numbers), exact known values, and values learned from sensitive cells during the run. It's applied to every log write and to everything sent to the model.
   - `describe()` drops any locator strategy that would embed a sensitive value, so PII can't enter an artifact by construction.
-  - Screenshot masks fail closed (the whole frame is masked if a target can't be resolved). Traces are opt-in and never committed. `scripts/scan_evidence.py` and a test scan everything committed for secrets and seeded PII.
+  - Screenshot masks fail closed (the whole frame is masked if a target can't be resolved). Traces are opt-in and never committed. `scripts/scan_evidence.py` and a test scan `evidence/` and `capabilities/` for secrets, seeded PII, AWS keys and local paths.
 
 **Limits, stated honestly:**
 - Regex can miss free-text PII.
-- The model does see non-sensitive page text. That's mitigated by synthetic data and by Bedrock staying inside the institution's own AWS account.
+- The model does see non-sensitive page text. That's mitigated here by synthetic data; in deployment, discovery would run through Bedrock in the institution's own AWS account.
 - Policy is enforced in-process, not by an OS sandbox.
-- The image scanner can't read text inside screenshots, so those were checked by eye.
+- The evidence scanner can't read text inside screenshots, so those were checked by eye.
 - The console has no authentication, and the CDP port gives full browser control (localhost only).
 - Human actions are flagged, not blocked.
 - Member numbers and balances aren't redacted, by design: they're the business key and the requested output.
-- The IAM policy is broader than it needs to be.
+- The development IAM user has the broad AmazonBedrockFullAccess managed policy; production would scope bedrock:InvokeModel to one model ARN.
 
 ## 7. Cuts
 
@@ -157,6 +158,7 @@ The result records a `human_intervention` recovery: operator, action count and t
 | Assisted fallback | Replay never calls a model | A bounded, policy-checked, single-step LLM recovery, recorded as evidence and gated by approval |
 | Code generation | Low value for the evaluation | Emit a Playwright test or page object from an artifact |
 | Services, queues | Not rewarded | A run service with a job queue and per-tenant isolation |
-| Least-privilege IAM; output descriptions in the CLI; recording CLI argv in the manifest | Time | Small follow-ups |
+| Least-privilege IAM; output descriptions in the CLI | Time | Small follow-ups |
+| Known issue | One non-reproducible failure of test_commit_uncertain_is_marked_handled_with_a_note (IllegalTransition from a nested escalation); passed 12+ times since | Errors inside escalation are now logged as escalation_error and the run aborts cleanly; root-cause if it recurs |
 
-**Built beyond the core:** tenant overrides (cross-tenant reuse), the multi-run stability summary (`--repeat N`), tool definitions per capability (`cua artifact tool`), and the draft → approved gate bound to the content hash.
+**Built beyond the core:** tenant overrides (cross-tenant reuse), the multi-run stability summary (`--repeat N`), tool definitions per capability (`cua artifact tool`) and an agent-facing catalog (`cua catalog list` / `cua catalog invoke`), and the draft → approved gate bound to the content hash.

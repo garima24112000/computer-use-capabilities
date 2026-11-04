@@ -6,7 +6,8 @@ from pathlib import Path
 import pytest
 
 from cua.hitl.control import ControlNotHeld
-from cua.hitl.hitl import HitlSession
+from cua.hitl.escalation import EscalationRequest
+from cua.hitl.hitl import HitlEscalator, HitlSession
 from cua.hitl.interventions import InterventionStore
 from cua.policy.guard import PolicyGuard
 from cua.replay.session import run_replay
@@ -127,3 +128,23 @@ def test_human_typing_secrets_is_captured_without_values(app_a, tmp_path, consol
         blob = path.read_bytes()
         for needle in FORBIDDEN + ["demo_operator"]:
             assert needle.encode() not in blob, f"{needle} leaked into {path}"
+
+
+def test_escalation_error_stops_cleanly_instead_of_escalating_twice(session, monkeypatch):
+    """An error after control left AUTOMATION must not propagate: the caller would escalate
+    again from AWAITING_HUMAN (IllegalTransition) and the real error would be lost."""
+    g, s = session
+
+    def broken(_iid, *a, **k):
+        raise RuntimeError("store unavailable")
+
+    monkeypatch.setattr(s, "wait_for_resolution", broken)
+    decision = HitlEscalator(s).escalate(EscalationRequest(
+        reason="app_error", raised_by="replay", run_id=g.run.run_id, step_id="s04"))
+    assert decision.action == "stop"
+    assert "escalation failed: RuntimeError: store unavailable" in decision.note
+    assert s.control.state == "DONE"
+    [iv] = s.store.list()
+    assert iv.status == "expired"
+    errs = [e for e in events(g.run.dir) if e["type"] == "escalation_error"]
+    assert errs and "store unavailable" in errs[0]["data"]["error"]

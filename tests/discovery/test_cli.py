@@ -2,6 +2,7 @@
 
 import contextlib
 import json
+from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
@@ -11,6 +12,8 @@ from cua.cli import app, parse_input, parse_output
 from cua.discovery.llm import BedrockConverseClient
 from cua.discovery.models import ContractError, build_contract
 from target_app import background
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_parse_input_and_output_specs():
@@ -152,16 +155,8 @@ def test_unexpected_failure_is_readable_and_debug_shows_traceback(monkeypatch, t
     assert isinstance(debug.exception, RuntimeError)
 
 
-SCRIPT = [
-    [{"name": "click", "args": {"ref": "@button:MEMBER INQUIRY", "intent": "Open inquiry."}}],
-    [{"name": "fill", "args": {"ref": "@textbox:MEMBER NO.", "value": "{{inputs.member_id}}",
-                               "intent": "Enter the member number."}}],
-    [{"name": "click", "args": {"ref": "@link:INQUIRE", "intent": "Run the inquiry."}}],
-    [{"name": "click", "args": {"ref": "@link[col=NAME]", "intent": "Open the detail."}}],
-    [{"name": "extract", "args": {"ref": "@cell[row=00,col=BALANCE]",
-                                  "output": "savings_balance", "intent": "Read balance."}}],
-    [{"name": "done", "args": {"summary": "Balance read."}}],
-]
+SCRIPT = json.loads((ROOT / "tests/fixtures/scripted/read_savings_balance.json")
+                    .read_text())  # also the README's offline example
 
 
 def test_cua_discover_with_scripted_llm(tmp_path, monkeypatch):
@@ -180,6 +175,11 @@ def test_cua_discover_with_scripted_llm(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
     assert "status    : completed" in result.output
     assert (tmp_path / "caps" / "meridian.member.read_savings_balance" / "1.0.0.json").exists()
+    [run_dir] = [p for p in (tmp_path / "runs").iterdir() if not p.name.startswith("_")]
+    argv = json.loads((run_dir / "manifest.json").read_text())["argv"]
+    assert argv[:4] == ["cua", "discover", "--goal", args[2]]  # the invocation is recorded
+    assert argv[argv.index("--input") + 1] == r"member_id=12345:string:^\d{5}$"
+    assert "--approve-mode" in argv and "--max-steps" not in argv  # defaults are omitted
 
     bad = CliRunner().invoke(app, [*args[:-4], "--max-steps", "2",
                                    "--runs-dir", str(tmp_path / "runs"),

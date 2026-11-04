@@ -55,8 +55,12 @@ it adds is excluded from the content hash, so the hash is the same as at discove
 
 ## Replay scenarios (regenerated)
 
-All scenarios use the 1.1.0 artifacts pinned as `id@version`, against a fresh target app (tenant A,
-or tenant B for drift). Each folder has `command.txt`, `console.txt` (exact output and exit
+All `cua replay` scenarios use the 1.1.0 artifacts pinned as `id@version`. Scenario 18 calls
+the capability by tool name instead (`cua catalog invoke`), which resolves to the latest
+approved version; the tool definitions an agent sees are in
+[`catalog/tools.json`](catalog/tools.json) (`cua catalog list --json`). All run against the
+target app the script starts (tenant A, or tenant B for drift), with faults reset before each
+scenario. Each folder has `command.txt`, `console.txt` (exact output and exit
 code), `result.json` and `events.jsonl`. Failure and recovery scenarios also have the masked
 `screenshots/` and text `snapshots/`. Exit codes: 0 success, 10 business outcome, 20 failed,
 30 escalated.
@@ -81,6 +85,7 @@ code), `result.json` and `events.jsonl`. Failure and recovery scenarios also hav
 | 15 | [`subaccount_approved_success`](replay/subaccount_approved_success/) | Approved irreversible capability commits once | success | 0 | confirmation_number = MC-919347; irreversible executed: s07_click_submit |
 | 16 | [`subaccount_deposit_out_of_bounds`](replay/subaccount_deposit_out_of_bounds/) | Deposit 20000 rejected by the contract bounds | failed | 20 | input_validation at - (retryable=false) |
 | 17 | [`commit_uncertain_session_after_submit`](replay/commit_uncertain_session_after_submit/) | Session lost right after SUBMIT: never retried, never re-logged in | failed | 20 | session_expired_after_commit at s07_click_submit (retryable=false); irreversible executed: s07_click_submit |
+| 18 | [`catalog_invoke_read_balance`](replay/catalog_invoke_read_balance/) | An agent calls the capability by tool name with typed JSON args (same replay path) | success | 0 | savings_balance = 12345.67 |
 <!-- replay-table:end -->
 
 ## HITL (copied)

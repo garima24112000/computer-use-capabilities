@@ -1,0 +1,124 @@
+[
+  {
+    "name": "meridian_member_read_savings_balance",
+    "description": "Read a member's share savings balance. Looks up a member by member number and returns the balance of the base Share Savings account.",
+    "capability": {
+      "id": "meridian.member.read_savings_balance",
+      "version": "1.1.0",
+      "status": "approved"
+    },
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "member_id": {
+          "description": "5-digit member number",
+          "type": "string",
+          "pattern": "^\\d{5}$",
+          "examples": [
+            "12345"
+          ]
+        }
+      },
+      "required": [
+        "member_id"
+      ],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "savings_balance": {
+          "type": "string",
+          "description": "savings balance",
+          "pattern": "^-?\\d+(\\.\\d+)?$"
+        }
+      },
+      "required": [
+        "savings_balance"
+      ],
+      "additionalProperties": false
+    },
+    "outcomes": [
+      "MEMBER_NOT_FOUND",
+      "INVALID_MEMBER_FORMAT",
+      "ACCESS_DENIED"
+    ]
+  },
+  {
+    "name": "meridian_subaccount_open",
+    "description": "Open a sub-account for a member. Opens a new sub-account with an initial deposit and returns the core's confirmation number. The final SUBMIT is irreversible and requires approval.",
+    "capability": {
+      "id": "meridian.subaccount.open",
+      "version": "1.1.0",
+      "status": "approved"
+    },
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "member_id": {
+          "description": "5-digit member number",
+          "type": "string",
+          "pattern": "^\\d{5}$",
+          "examples": [
+            "22222"
+          ]
+        },
+        "account_type": {
+          "description": "account type",
+          "type": "string",
+          "enum": [
+            "Share Savings",
+            "Money Market",
+            "Certificate 12mo"
+          ],
+          "examples": [
+            "Money Market"
+          ]
+        },
+        "initial_deposit": {
+          "description": "Initial deposit in dollars",
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 10000.0,
+          "examples": [
+            "250.00"
+          ]
+        },
+        "nickname": {
+          "description": "nickname",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9 ]{0,20}$",
+          "examples": [
+            "Rainy Day"
+          ]
+        }
+      },
+      "required": [
+        "member_id",
+        "account_type",
+        "initial_deposit"
+      ],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "confirmation_number": {
+          "type": "string",
+          "description": "confirmation number"
+        }
+      },
+      "required": [
+        "confirmation_number"
+      ],
+      "additionalProperties": false
+    },
+    "outcomes": [
+      "MEMBER_NOT_FOUND",
+      "INVALID_MEMBER_FORMAT",
+      "ACCESS_DENIED",
+      "DEPOSIT_OUT_OF_RANGE",
+      "INVALID_DEPOSIT_AMOUNT"
+    ]
+  }
+]

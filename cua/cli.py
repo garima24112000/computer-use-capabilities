@@ -182,6 +182,24 @@ def parse_output(spec: str) -> dict:
     return out
 
 
+def _invocation(ctx: typer.Context) -> list[str]:
+    """The current command as an argv list, rebuilt from the parsed parameters (non-default
+    values only, in declaration order). Works the same under the real CLI and CliRunner."""
+    argv = ["cua", ctx.info_name or ""]
+    for param in ctx.command.params:
+        value = ctx.params.get(param.name)
+        if value is None or value == param.default or (value == () and not param.default):
+            continue
+        if param.param_type_name == "argument":
+            argv.append(str(value))
+        elif getattr(param, "is_flag", False):
+            argv.append(param.opts[0] if value else (param.secondary_opts or param.opts)[0])
+        else:
+            for v in value if isinstance(value, list | tuple) else [value]:
+                argv += [param.opts[0], str(v)]
+    return argv
+
+
 def _usage_error(message: str) -> typer.Exit:
     typer.echo(f"error: {message}", err=True)
     return typer.Exit(2)
@@ -189,6 +207,7 @@ def _usage_error(message: str) -> typer.Exit:
 
 @app.command()
 def discover(
+    ctx: typer.Context,
     goal: Annotated[str, typer.Option(help="what the operator wants done")],
     capability_id: Annotated[str, typer.Option("--id", help="capability id, e.g. a.b.c")],
     title: Annotated[str | None, typer.Option(help="capability title")] = None,
@@ -222,6 +241,8 @@ def discover(
     """
     import contextlib
     import os
+
+    argv = _invocation(ctx)  # recorded (redacted) in the run manifest
 
     from dotenv import load_dotenv
 
@@ -284,7 +305,8 @@ def discover(
                                    headless=not (headed or hitl), trace=trace,
                                    runs_root=runs_dir,
                                    capabilities_root=capabilities_dir or store.CAPABILITIES_DIR,
-                                   hitl=hitl, console_approval=approve_mode == "console")
+                                   hitl=hitl, console_approval=approve_mode == "console",
+                                   argv=argv)
     except Exception as exc:
         if debug:
             raise
@@ -394,17 +416,11 @@ def replay(
 ) -> None:
     """Replay a capability deterministically (no LLM). Exit: 0 success, 10 business outcome,
     20 failed, 30 escalated, 2 invalid invocation."""
-    import contextlib
-
     from dotenv import load_dotenv
 
     from cua.artifact import store
-    from cua.artifact.profile import AppProfile
-    from cua.hitl.terminal import TerminalApprover
-    from cua.policy.guard import DenyAllApprover
     from cua.replay.harness import FaultInjection
-    from cua.replay.session import resolve_artifact, run_replay
-    from target_app import background
+    from cua.replay.session import resolve_artifact
 
     load_dotenv()
     values: dict[str, str] = {}
@@ -427,6 +443,25 @@ def replay(
                                              faults=json.loads(inject_at[1])))
     except (json.JSONDecodeError, ValueError) as exc:
         raise _usage_error(f"--inject/--inject-at: invalid JSON ({exc})") from None
+    _replay_and_exit(path, values, tenant=tenant, override=override, headed=headed,
+                     start_app=start_app, base_url=base_url, approve_mode=approve_mode,
+                     hitl=hitl, as_json=as_json, repeat=repeat, injections=injections,
+                     runs_dir=runs_dir, caps_root=caps_root, debug=debug)
+
+
+def _replay_and_exit(path: Path, values: dict, *, tenant: str, override: bool, headed: bool,
+                     start_app: bool, base_url: str | None, approve_mode: str, hitl: bool,
+                     as_json: bool, repeat: int, injections: list, runs_dir: Path,
+                     caps_root: Path, debug: bool) -> None:
+    """The shared replay path of `cua replay` and `cua catalog invoke` (raises typer.Exit)."""
+    import contextlib
+
+    from cua.artifact.profile import AppProfile
+    from cua.hitl.terminal import TerminalApprover
+    from cua.policy.guard import DenyAllApprover
+    from cua.replay.session import run_replay
+    from target_app import background
+
     if approve_mode not in ("deny", "prompt", "console"):
         raise _usage_error("--approve-mode must be deny, prompt or console")
     if not start_app and not base_url:
@@ -491,6 +526,80 @@ def operator(
     typer.echo(f"operator console on http://127.0.0.1:{port}/ (store {store.path})")
     uvicorn.run(create_console(store, runs_root=runs_dir), host="127.0.0.1", port=port,
                 log_level="warning")
+
+
+catalog_app = typer.Typer(help="Capabilities as agent tools: list them, invoke one by name.",
+                          no_args_is_help=True)
+app.add_typer(catalog_app, name="catalog")
+
+
+@catalog_app.command("list")
+def catalog_list(
+    show_all: Annotated[bool, typer.Option("--all", help="also list drafts (marked draft)")
+                        ] = False,
+    as_json: Annotated[bool, typer.Option("--json", help="print the tool definitions")] = False,
+    capabilities_dir: Annotated[Path | None, typer.Option(
+        help="artifact store (default: capabilities/)")] = None,
+) -> None:
+    """List tools: the latest APPROVED version of each capability (drafts with --all)."""
+    from cua import catalog
+    from cua.artifact import store
+
+    found = catalog.entries(capabilities_dir or store.CAPABILITIES_DIR, include_drafts=show_all)
+    if as_json:
+        typer.echo(json.dumps([e.tool for e in found], indent=2, ensure_ascii=False))
+        return
+    if not found:
+        typer.echo("no approved capabilities (use --all to include drafts)")
+    for e in found:
+        t = e.tool
+        mark = "" if e.status == "approved" else f"  [{e.status.upper()}]"
+        typer.echo(f"{t['name']}  ({e.ref}){mark}")
+        typer.echo(f"  {t['description']}")
+        ins = ", ".join(f"{k}{'' if k in t['input_schema']['required'] else '?'}: {v['type']}"
+                        for k, v in t["input_schema"]["properties"].items())
+        outs = ", ".join(f"{k}: {v['type']}" for k, v in t["output_schema"]["properties"].items())
+        typer.echo(f"  inputs:   {ins}")
+        typer.echo(f"  outputs:  {outs}")
+        typer.echo(f"  outcomes: {', '.join(t['outcomes']) or '-'}")
+
+
+@catalog_app.command("invoke")
+def catalog_invoke(
+    tool: Annotated[str, typer.Argument(help="tool name from `cua catalog list`")],
+    args: Annotated[str, typer.Option("--args", help="tool arguments as a JSON object")],
+    tenant: Annotated[str, typer.Option(help="target tenant (applies its override)")] = "a",
+    as_json: Annotated[bool, typer.Option("--json", help="print the ReplayResult JSON")] = False,
+    show_all: Annotated[bool, typer.Option("--all", help="allow invoking a draft")] = False,
+    headed: Annotated[bool, typer.Option(help="show the browser")] = False,
+    start_app: Annotated[bool, typer.Option(
+        help="start the target app in the background on a free port")] = True,
+    base_url: Annotated[str | None, typer.Option(help="target app URL (--no-start-app)")] = None,
+    approve_mode: Annotated[str, typer.Option(help="deny | prompt | console")] = "deny",
+    runs_dir: Annotated[Path, typer.Option(help="where run evidence goes")] = Path("runs"),
+    capabilities_dir: Annotated[Path | None, typer.Option(
+        help="artifact store (default: capabilities/)")] = None,
+    debug: Annotated[bool, typer.Option(help="show full tracebacks")] = False,
+) -> None:
+    """Invoke a tool by name with typed JSON args: the normal replay path (no LLM).
+    Exit: 0 success, 10 business outcome, 20 failed, 30 escalated, 2 invalid invocation."""
+    from dotenv import load_dotenv
+
+    from cua import catalog
+    from cua.artifact import store
+
+    load_dotenv()
+    caps_root = capabilities_dir or store.CAPABILITIES_DIR
+    try:
+        entry = catalog.resolve(tool, caps_root, include_drafts=show_all)
+        values = catalog.validate_args(entry, catalog.parse_args(args))
+    except catalog.CatalogError as exc:
+        raise _usage_error(str(exc)) from None
+    typer.echo(f"tool {tool} -> {entry.ref}", err=True)
+    _replay_and_exit(entry.path, values, tenant=tenant, override=True, headed=headed,
+                     start_app=start_app, base_url=base_url, approve_mode=approve_mode,
+                     hitl=False, as_json=as_json, repeat=1, injections=[], runs_dir=runs_dir,
+                     caps_root=caps_root, debug=debug)
 
 
 interventions_app = typer.Typer(help="Inspect HITL interventions.", no_args_is_help=True)

@@ -43,6 +43,7 @@ def run_discovery(
     hitl_store: InterventionStore | None = None,
     hitl_timeout_s: float = 15 * 60,
     approval_timeout_s: float = 10 * 60,
+    argv: list[str] | None = None,
 ) -> DiscoveryResult:
     goal.contract()  # fail fast (ContractError) before any run dir, browser or LLM call
     policy = PolicyConfig.load(policy_path)
@@ -52,7 +53,8 @@ def run_discovery(
         if inp.sensitive:
             redactor.register_sensitive(str(inp.value), "INPUT")
     run = RunContext("discovery", redactor, root=runs_root, capability=goal.capability_id,
-                     goal=goal.goal, tenant=goal.tenant, model_id=llm.model_id, trace=trace)
+                     goal=goal.goal, tenant=goal.tenant, model_id=llm.model_id, trace=trace,
+                     argv=argv)
     logger = EventLogger(run, redactor)
     transcript = TranscriptWriter(run, redactor)
     inner = PlaywrightSurface(headless=headless, dialog_policy=profile_dialog_policy(profile),

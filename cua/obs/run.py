@@ -41,6 +41,8 @@ class RunManifest(BaseModel):
     trace_enabled: bool = False
     # Test-harness fault injections (POST /__faults, never through the agent surface).
     harness_faults: list[dict] = []
+    # The CLI invocation (`cua discover ...`), redacted like everything else in the manifest.
+    argv: list[str] | None = None
 
 
 def _git_commit() -> str | None:
@@ -59,7 +61,8 @@ def new_run_id() -> str:
 class RunContext:
     def __init__(self, kind: RunKind, redactor: Redactor, *, root: str | Path = "runs",
                  capability: str | None = None, goal: str | None = None,
-                 tenant: str | None = None, model_id: str | None = None, trace: bool = False):
+                 tenant: str | None = None, model_id: str | None = None, trace: bool = False,
+                 argv: list[str] | None = None):
         self.redactor = redactor
         self.run_id = new_run_id()
         self.dir = Path(root) / self.run_id
@@ -73,7 +76,7 @@ class RunContext:
         self.manifest = RunManifest(
             run_id=self.run_id, kind=kind, started_at=datetime.now(UTC), capability=capability,
             goal=goal, tenant=tenant, model_id=model_id, git_commit=_git_commit(),
-            trace_enabled=trace,
+            trace_enabled=trace, argv=argv,
         )
         self._write_manifest()
 

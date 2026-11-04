@@ -12,13 +12,16 @@ and writes evidence/replay/<scenario>/:
 
 Then it rewrites local absolute paths to repo-relative ones, checks every scenario's expected
 exit code / status, and writes the summary table into evidence/README.md (between the
-`replay-table` markers). Idempotent: it wipes and regenerates evidence/replay/ only.
+`replay-table` markers; a run of selected scenarios replaces only their rows). It also writes
+evidence/catalog/tools.json (`cua catalog list --json`). Idempotent: a full run wipes and
+regenerates evidence/replay/ only.
 
 Usage: uv run python scripts/make_evidence.py [scenario ...]
 """
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -55,7 +58,7 @@ class Scenario:
     recovery: str | None = None  # expected recovery kind
     keep_images: bool = False  # failure / recovery: copy screenshots + snapshots
     store: str | None = None  # "draft_open": a temp store with a DRAFT copy of subaccount.open
-    extra: list[str] = field(default_factory=list)
+    command: list[str] = field(default_factory=lambda: ["replay"])  # or ["catalog", "invoke"]
 
 
 def inj(step: str, faults: dict) -> list[str]:
@@ -120,6 +123,10 @@ SCENARIOS = [
              [OPEN, *open_inputs("55555", "Money Market", "250.00"),
               *inj("s07_click_submit", {"expire_session_now": True})],
              "failed", 20, category="session_expired_after_commit", keep_images=True),
+    Scenario("catalog_invoke_read_balance",
+             "An agent calls the capability by tool name with typed JSON args (same replay path)",
+             ["meridian_member_read_savings_balance", "--args", '{"member_id": "12345"}'],
+             "success", 0, command=["catalog", "invoke"]),
 ]
 
 
@@ -230,7 +237,7 @@ def run_scenario(s: Scenario, apps: dict[str, App]) -> dict:
     app.reset()
     work = WORK / s.name
     shutil.rmtree(ROOT / work, ignore_errors=True)
-    args = ["replay", *s.args, "--no-start-app", "--base-url", app.url, "--runs-dir", str(work)]
+    args = [*s.command, *s.args, "--no-start-app", "--base-url", app.url, "--runs-dir", str(work)]
     if s.store == "draft_open":
         args += ["--capabilities-dir", str(draft_open_store())]
     shown = "uv run cua " + " ".join(_quote(a) for a in args)
@@ -270,6 +277,14 @@ def _quote(arg: str) -> str:
     return f"'{arg}'" if any(c in arg for c in ' {}"') else arg
 
 
+def write_catalog() -> None:
+    """evidence/catalog/tools.json: what an agent sees (`cua catalog list --json`)."""
+    out = subprocess.run([sys.executable, "-m", "cua.cli", "catalog", "list", "--json"],
+                         cwd=ROOT, capture_output=True, text=True, check=True).stdout
+    (EVIDENCE / "catalog").mkdir(exist_ok=True)
+    (EVIDENCE / "catalog" / "tools.json").write_text(sanitize_text(out))
+
+
 def table(rows: list[dict]) -> str:
     lines = ["| # | Scenario | What it proves | Status | Exit | Key result |",
              "|---|---|---|---|---|---|"]
@@ -280,14 +295,28 @@ def table(rows: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _existing_rows(block: str) -> dict[str, dict]:
+    """Rows of the current README table (so a partial run keeps the others untouched)."""
+    rows = {}
+    for line in block.splitlines():
+        cells = [c.strip() for c in re.split(r"(?<!\\)\|", line)[1:-1]]
+        m = re.match(r"\[`([^`]+)`\]", cells[1]) if len(cells) == 6 else None
+        if m:
+            rows[m.group(1)] = {"scenario": m.group(1), "proves": cells[2], "status": cells[3],
+                                "exit": cells[4], "key": cells[5].replace("\\|", "|")}
+    return rows
+
+
 def write_readme(rows: list[dict]) -> None:
     readme = EVIDENCE / "README.md"
     text = readme.read_text() if readme.exists() else f"# Evidence\n\n{START}\n{END}\n"
     if START not in text:
         text += f"\n{START}\n{END}\n"
     head, rest = text.split(START, 1)
-    _, tail = rest.split(END, 1)
-    readme.write_text(f"{head}{START}\n{table(rows)}\n{END}{tail}")
+    block, tail = rest.split(END, 1)
+    merged = _existing_rows(block) | {r["scenario"]: r for r in rows}
+    ordered = [merged[s.name] for s in SCENARIOS if s.name in merged]
+    readme.write_text(f"{head}{START}\n{table(ordered)}\n{END}{tail}")
 
 
 def main(selected: list[str]) -> int:
@@ -312,10 +341,10 @@ def main(selected: list[str]) -> int:
     finally:
         for app in apps.values():
             app.stop()
+    write_catalog()
     print()
     print(table(rows))
-    if not selected:
-        write_readme(rows)
+    write_readme(rows)
     bad = [r for r in rows if r["problems"]]
     if bad:
         print(f"\n{len(bad)} scenario(s) did not behave as expected", file=sys.stderr)

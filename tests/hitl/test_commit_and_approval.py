@@ -27,7 +27,7 @@ def test_commit_uncertain_is_marked_handled_with_a_note(app_a, tmp_path, console
     note = "checked the core: no new sub-account exists; safe to retry"
     assert console.cmd(iv["id"], "handled", operator="frank", note=note).status_code == 200
     result = run.join()
-    assert result.status == "escalated"
+    assert result.status == "escalated", result.failure  # shows any escalation_error detail
     assert result.failure.category == "session_expired_after_commit"
     assert result.failure.escalation["resolution"] == note
     assert result.irreversible_executed == [submit]

@@ -1,0 +1,57 @@
+[
+  [
+    {
+      "name": "click",
+      "args": {
+        "ref": "@button:MEMBER INQUIRY",
+        "intent": "Open inquiry."
+      }
+    }
+  ],
+  [
+    {
+      "name": "fill",
+      "args": {
+        "ref": "@textbox:MEMBER NO.",
+        "value": "{{inputs.member_id}}",
+        "intent": "Enter the member number."
+      }
+    }
+  ],
+  [
+    {
+      "name": "click",
+      "args": {
+        "ref": "@link:INQUIRE",
+        "intent": "Run the inquiry."
+      }
+    }
+  ],
+  [
+    {
+      "name": "click",
+      "args": {
+        "ref": "@link[col=NAME]",
+        "intent": "Open the detail."
+      }
+    }
+  ],
+  [
+    {
+      "name": "extract",
+      "args": {
+        "ref": "@cell[row=00,col=BALANCE]",
+        "output": "savings_balance",
+        "intent": "Read balance."
+      }
+    }
+  ],
+  [
+    {
+      "name": "done",
+      "args": {
+        "summary": "Balance read."
+      }
+    }
+  ]
+]

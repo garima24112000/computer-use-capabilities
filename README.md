@@ -1,145 +1,254 @@
 # Computer-Use Capabilities
 
-An LLM discovers how to complete a goal in a UI that has no API. The successful run is saved as a
-typed, versioned capability artifact, and that artifact is replayed deterministically with no LLM
-in the loop. The project also includes human-in-the-loop handoff and safety guardrails. See
-[CLAUDE.md](CLAUDE.md) for the project rules.
+An LLM **discovers** how to complete a goal in a legacy UI that has no API. The successful run is
+compiled into a typed, versioned **capability artifact** (a contract plus reviewable steps), and
+the artifact is **replayed deterministically with no LLM in the loop**. Replay returns a structured
+result that separates business outcomes, recoveries and hard failures. When automation can't
+continue safely, a **human takes over the same live browser session** and hands control back.
+Guardrails cover every action: an allowlist, risk tiers, approvals for irreversible steps,
+redaction, and a control lease.
 
-> Status: target app, surface layer, guardrails, the capability artifact schema, LLM discovery,
-> deterministic replay and human-in-the-loop handoff are built.
+The target is **Meridian Core**, a deliberately hostile mock core-banking console: framesets,
+nested tables, no ids/ARIA/labels, `javascript:` links, and counter-based fault injection.
 
-## Install
+- Design write-up: [REPORT.md](REPORT.md)
+- Evidence index (discovery, replay, HITL): [evidence/README.md](evidence/README.md)
+- HITL handoff video: [evidence/hitl/hitl_handoff.mp4](evidence/hitl/hitl_handoff.mp4)
+
+## Repository layout
+
+```
+cua/                 the system (Python package)
+  surface/           Surface interface + Playwright web implementation (frame-aware DOM scan, locators)
+  policy/            GuardedSurface, allowlist/risk rules, approvals, redaction, network filter
+  artifact/          capability schema, lint, app profiles, tenant overrides, store, renderers
+  discovery/         LLM loop (LLMClient: Bedrock Converse + scripted), tools, prompts, recorder
+  execute.py         deterministic action/checkpoint executor shared by discovery and replay
+  replay/            replay engine, result contract, session wiring, test-only fault harness
+  hitl/              control state machine + lease, intervention store, capture, operator console
+  obs/               run directories, redacted event log, transcript, evidence capture
+  catalog.py         capabilities as agent tools (`cua catalog`)
+  cli.py             the `cua` command
+target_app/          Meridian Core mock (FastAPI): tenants, seed data, fault injection
+configs/             policy.yaml, app_profiles/ (meridian-core.yaml + tenants/ overrides)
+capabilities/        saved artifacts: capabilities/<id>/<version>.json
+schemas/             exported JSON Schemas (`cua artifact schema`)
+scripts/             make_evidence.py, scan_evidence.py, smoke/observe helpers
+evidence/            committed, redacted evidence (see its README)
+tests/               pytest suite (scripted LLM, local app, real headless Chromium)
+runs/                per-run output (gitignored)
+```
+
+## Setup
+
+Prerequisites: macOS or Linux, and [uv](https://docs.astral.sh/uv/). uv installs Python 3.11.
 
 ```bash
 uv sync
 uv run playwright install chromium
-cp .env.example .env   # fake demo creds; AWS creds come from your AWS profile
+cp .env.example .env
 ```
 
-## Run the target app (Meridian Core mock bank)
+`.env` holds the fake operator sign-on for the mock bank (`BANK_OPERATOR_USER`,
+`BANK_OPERATOR_PASS`). It is gitignored and never holds AWS keys.
+
+**Discovery only** needs AWS Bedrock:
+- `AWS_PROFILE`, `AWS_REGION` and `BEDROCK_MODEL_ID` (an inference profile id) set in `.env`.
+- Credentials come from that AWS profile, never from `.env`.
+- Model access enabled in the Bedrock console.
+
+**Replay, the tests, the operator console and the evidence scripts need NO cloud credentials and
+no network.** Everything runs against the local mock app on 127.0.0.1.
+
+## Run without live services
 
 ```bash
-uv run python -m target_app --port 8001 --tenant a   # or --tenant b
-# open http://127.0.0.1:8001/  — sign on as demo_operator / demo-pass-123 (fake)
-```
-
-Seeded members (all fake): `12345 22222 31415 40300 55555 70001`. Member `40300` is restricted.
-
-Fault injection (counter-based and deterministic; no auth needed):
-
-```bash
-curl -X POST localhost:8001/__faults -H 'content-type: application/json' \
-     -d '{"latency_ms": 3000, "latency_count": 2}'
-curl -X POST localhost:8001/__faults -d '{"interstitial_count": 1}' -H 'content-type: application/json'
-curl -X POST localhost:8001/__faults -d '{"js_confirm_count": 1}' -H 'content-type: application/json'
-curl -X POST localhost:8001/__faults -d '{"expire_session_now": true}' -H 'content-type: application/json'
-curl -X POST localhost:8001/__faults -d '{"http500_count": 1, "http500_path_prefix": "/member"}' -H 'content-type: application/json'
-curl localhost:8001/__faults            # current state
-curl -X POST localhost:8001/__faults/reset
-```
-
-## Test
-
-```bash
-uv run pytest                          # unit/behavior tests (FastAPI TestClient)
-uv run python scripts/smoke_target.py  # real headless browser drives the app end to end
-uv run python scripts/observe.py       # print the Observation an LLM would see (member 12345)
+uv run pytest                 # full suite: scripted LLM, local app, headless Chromium (~9 min)
 uv run ruff check .
+
+# Discovery with canned tool calls instead of Bedrock (writes to runs/, which is gitignored)
+uv run cua discover \
+  --goal "Look up member 12345 and read their Share Savings balance" \
+  --id meridian.member.read_savings_balance --title "Read a member's share savings balance" \
+  --input 'member_id=12345:string:^\d{5}$' --output savings_balance:money:money_to_decimal \
+  --llm scripted:tests/fixtures/scripted/read_savings_balance.json \
+  --runs-dir runs --capabilities-dir runs/scripted-capabilities
+
+# Replay the committed artifacts (the target app starts in the background on a free port)
+uv run cua replay meridian.member.read_savings_balance --input member_id=12345
 ```
 
-## Discover a capability (LLM)
+To look at the mock app yourself: `uv run python -m target_app --port 8001 --tenant a` (or
+`--tenant b`), then open http://127.0.0.1:8001/ and sign on as `demo_operator` /
+`demo-pass-123` (fake). The seeded members are `12345 22222 31415 40300 55555 70001`; `40300` is
+restricted.
 
-Needs AWS credentials in the `AWS_PROFILE` profile and `BEDROCK_MODEL_ID` in `.env`. The target
-app starts in the background automatically; the agent signs on with the profile's secrets, which
-it never sees.
+## Demo path
+
+### a. Discovery (real LLM)
+
+These are the exact commands used for the committed 1.1.0 artifacts:
 
 ```bash
 uv run cua discover \
   --goal "Look up member 12345 and read their Share Savings balance" \
-  --id meridian.member.read_savings_balance --title "Read a member's share savings balance" \
-  --input 'member_id=12345:string:^\d{5}$' --output savings_balance:money:money_to_decimal
-# offline / no AWS: --llm scripted:<file.json>   (canned tool calls, see tests/discovery)
+  --id meridian.member.read_savings_balance \
+  --title "Read a member's share savings balance" \
+  --description "Looks up a member by member number and returns the balance of the base Share Savings account." \
+  --input 'member_id=12345:string:^\d{5}$' \
+  --input-desc member_id="5-digit member number" \
+  --output savings_balance:money:money_to_decimal \
+  --headed
+
+uv run cua discover \
+  --goal "Open a new Money Market sub-account for member 22222 with an initial deposit of 250.00 and nickname Rainy Day, and reach the confirmation screen" \
+  --id meridian.subaccount.open \
+  --title "Open a sub-account for a member" \
+  --description "Opens a new sub-account with an initial deposit and returns the core's confirmation number. The final SUBMIT is irreversible and requires approval." \
+  --input 'member_id=22222:string:^\d{5}$' \
+  --input 'account_type=Money Market:enum:Share Savings|Money Market|Certificate 12mo' \
+  --input 'initial_deposit=250.00:decimal:0.01..10000' \
+  --input 'nickname?=Rainy Day:string:^[A-Za-z0-9 ]{0,20}$' \
+  --input-desc member_id="5-digit member number" \
+  --input-desc initial_deposit="Initial deposit in dollars" \
+  --output 'confirmation_number:string:strip:(MC-\d{6})' \
+  --headed
 ```
 
-Each run writes `runs/<run_id>/` (events, redacted transcript, masked step screenshots,
-summary.json) and a **draft** artifact in `capabilities/<id>/<version>.json`. Irreversible
-actions ask for approval at the terminal (`--approve-mode deny` refuses them).
+- A new discovery saves the **next MINOR version** as a draft. With 1.1.0 committed, that is
+  `1.2.0`.
+- The sub-account run stops at the irreversible SUBMIT and asks `y/N` at the terminal
+  (`--approve-mode prompt`, the default).
+- Each run writes `runs/<run_id>/`: events, the redacted transcript, masked screenshots,
+  `summary.json`, and `manifest.json` with the CLI argv.
 
-## Replay a capability (no LLM, no cloud credentials)
+### b. Review and approve
 
 ```bash
-uv run cua replay meridian.member.read_savings_balance --input member_id=12345        # exit 0
-uv run cua replay meridian.member.read_savings_balance --input member_id=99999        # exit 10
-uv run cua replay meridian.member.read_savings_balance --input member_id=12345 --tenant b
-uv run cua replay meridian.member.read_savings_balance --input member_id=12345 --repeat 5
-uv run cua replay meridian.member.read_savings_balance --input member_id=12345 --json
-# test harness only (POSTs /__faults, recorded in the run manifest):
+uv run cua artifact show capabilities/meridian.subaccount.open/1.1.0.json      # review rendering
+uv run cua artifact tool capabilities/meridian.subaccount.open/1.1.0.json      # agent's view
+uv run cua artifact approve capabilities/meridian.subaccount.open/1.1.0.json --reviewer NAME --note "..."
+```
+
+Approval records the content hash. Any later functional edit voids it, and replay then refuses
+the irreversible steps.
+
+### c. Replay (no LLM)
+
+Each command below is followed by the first line of its result:
+
+```bash
+uv run cua replay meridian.member.read_savings_balance --input member_id=12345
+# SUCCESS  meridian.member.read_savings_balance v1.1.0  (approved)  ... ms  run ...   (exit 0)
+
+uv run cua replay meridian.member.read_savings_balance --input member_id=99999
+# BUSINESS_OUTCOME  meridian.member.read_savings_balance v1.1.0  (approved) ...        (exit 10)
+
+# Fault injection is a TEST HARNESS (POST /__faults), recorded in the run manifest
 uv run cua replay meridian.member.read_savings_balance --input member_id=12345 \
   --inject-at s03_click_inquire '{"interstitial_count": 1}'
-```
+# SUCCESS ...   then: recovery interstitial:maintenance_notice at s03_click_inquire
 
-Exit codes: 0 success, 10 business outcome, 20 failed, 30 escalated, 2 invalid invocation.
-Artifacts with irreversible steps replay only after `cua artifact approve`. Every run writes
-`runs/<run_id>/result.json` (the typed `ReplayResult`), events and masked step screenshots.
-
-## Human-in-the-loop handoff
-
-```bash
-uv run cua operator                      # terminal 1: console on http://127.0.0.1:8700/
-uv run cua replay meridian.member.read_savings_balance --input member_id=12345 --hitl \
+uv run cua replay meridian.member.read_savings_balance --input member_id=12345 \
   --inject-at s04_click_name '{"http500_count": 1, "http500_path_prefix": "/member"}'
-uv run cua discover ... --hitl --approve-mode console   # escalations + approvals in the console
-uv run cua interventions list --status open
+# FAILED ...    then: failure app_error at s04_click_name (retryable=true)       (exit 20)
+
+uv run cua replay meridian.member.read_savings_balance --input member_id=12345 --tenant b
+# SUCCESS ...   (tenant B's UI drift handled by configs/app_profiles/tenants/tenant-b.yaml)
+
+uv run cua replay meridian.member.read_savings_balance --input member_id=12345 --tenant b --no-override
+# FAILED ...    then: failure structural_only_on_risky at s03_click_inquire (retryable=false)
+
+uv run cua replay meridian.member.read_savings_balance --input member_id=12345 --repeat 5
+# SUCCESS ...   then: STABILITY over 5 runs: success=5, identical step sequence: yes
+
+uv run cua replay meridian.subaccount.open --input member_id=31415 \
+  --input "account_type=Share Savings" --input initial_deposit=100.00
+# SUCCESS  meridian.subaccount.open v1.1.0  (approved) ...  then: confirmation_number = MC-......
 ```
 
-With `--hitl` a failure pauses automation and opens an intervention. An operator clicks **Take
-control** and works in the SAME browser (the headed window, or DevTools attached to the
-localhost CDP port). Their clicks and edits are captured (redacted), and **Resume** hands
-control back. Replay then verifies the page before continuing. One owner at a time is
-enforced by a control lease that GuardedSurface checks before every automation action.
+Add `--json` to print the full `ReplayResult`. Every run writes `runs/<run_id>/result.json`.
 
-Security: the console binds 127.0.0.1 and has no authentication. The CDP port is full control
-of the browser, localhost only. A production deployment needs SSO, per-operator authorization,
-an audit trail and an authenticated, proxied screencast instead of raw CDP.
-
-## Capability artifacts
-
-A capability is a typed, versioned JSON artifact (`capabilities/<id>/<version>.json`). It holds the
-contract (inputs, outputs, business outcomes), the replayable steps with multi-strategy locators,
-the checkpoints, and the approval/provenance records. App-wide behaviour (login, interstitials,
-dialogs, error screens, shared outcomes, PII labels) lives in the app profile
-`configs/app_profiles/meridian-core.yaml`. Per-tenant UI differences live in overlays under
-`configs/app_profiles/tenants/`.
+### d. HITL live handoff
 
 ```bash
-F=tests/fixtures/capabilities/meridian.member.read_savings_balance/1.0.0.json
-uv run cua artifact validate $F          # schema + lint (all problems at once)
-uv run cua artifact show $F              # human review rendering (markdown)
-uv run cua artifact tool $F              # what a calling agent sees (JSON Schema in/out)
-uv run cua artifact approve $F --reviewer NAME [--note ...]   # approve gated steps, record hash
-uv run cua artifact schema               # export schemas/*.schema.json
-uv run cua profile validate configs/app_profiles/meridian-core.yaml
+uv run cua operator        # terminal 1: console on http://127.0.0.1:8700/
+uv run cua replay meridian.member.read_savings_balance --input member_id=12345 --hitl \
+  --inject-at s04_click_name '{"http500_count": 1, "http500_path_prefix": "/member"}'   # terminal 2
 ```
 
-> **The two artifacts under `tests/fixtures/capabilities/` are HAND-WRITTEN TEST FIXTURES**
-> (`meridian.member.read_savings_balance`, `meridian.subaccount.open`). They exist to test the
-> schema and to develop replay. The real artifacts in `capabilities/` will come from LLM discovery.
+1. Terminal 2 opens a Chromium window. Replay hits SYSTEM ERROR 0xC0FFEE and waits; the banner
+   in the browser reads "WAITING FOR AN OPERATOR".
+2. In the console, open the `replay_failure` intervention, enter your name and click
+   **Take control**. The banner changes to "HUMAN IN CONTROL".
+3. In the browser window, do the lookup by hand: **» MEMBER INQUIRY**, type `12345`, click
+   **INQUIRE**, then click the member's name. The console lists your actions, redacted.
+4. Click **Resume** in the console. Replay re-verifies the page and prints `SUCCESS`,
+   `savings_balance = 12345.67`, and a `human_intervention` recovery (rule
+   `success_checkpoint`).
 
-## Layout
+`uv run cua interventions list` shows the intervention as resolved. Discovery supports the same
+flow with `--hitl --approve-mode console`.
 
-| Path | Responsibility |
-|---|---|
-| `target_app/` | Mock legacy core-banking console (hostile DOM, frames, faults, tenants) |
-| `cua/surface/` | Perceive and act on a UI surface (observer, actions, locators) |
-| `cua/policy/` | Allowlist, risk classification, redaction |
-| `cua/artifact/` | Capability schema (pydantic), app profiles, (de)serialization |
-| `cua/discovery/` | LLM agent loop and recorder |
-| `cua/replay/` | Deterministic replay engine and result contract |
-| `cua/hitl/` | Control state machine, intervention store, operator console |
-| `cua/obs/` | Structured event logging, evidence capture |
-| `cua/cli.py` | `cua` CLI entry point |
-| `configs/` | `policy.yaml`, `app_profiles/` (profile YAML + `tenants/` overrides) |
-| `capabilities/` | Saved artifacts (JSON) |
-| `schemas/` | Exported JSON Schemas (`cua artifact schema`) |
-| `evidence/` | Committed, redacted evidence ([index](evidence/README.md)); `replay/` is regenerated by `scripts/make_evidence.py`, and `scripts/scan_evidence.py` checks it all |
-| `runs/` | Per-run output (gitignored) |
+### e. Capability catalog (capabilities as agent tools)
+
+```bash
+uv run cua catalog list                  # latest approved version of each capability (--all: drafts too)
+uv run cua catalog list --json           # the tool definitions: input/output JSON Schema + outcome codes
+uv run cua catalog invoke meridian_member_read_savings_balance --args '{"member_id": "12345"}'
+```
+
+`invoke` validates the arguments against the tool's `input_schema` and the contract. Invalid
+arguments exit 2 before any browser starts. It then runs the normal replay path, with the same
+exit codes.
+
+### f. Regenerate and check the evidence
+
+```bash
+uv run python scripts/make_evidence.py            # all replay scenarios -> evidence/replay/
+uv run python scripts/make_evidence.py success_12345   # or only the named scenarios
+uv run python scripts/scan_evidence.py            # secrets / PII / AWS keys / local paths / size
+```
+
+## Result contract and exit codes
+
+Every replay returns a typed `ReplayResult` (`cua/replay/result.py`): status, outputs or
+business outcome, and on failure a `failure` with category, step id, expected vs observed,
+retryable flag and evidence paths. It also lists `recoveries`, per-step `drift` and
+`irreversible_executed`.
+
+| Exit | Status | Meaning |
+|---|---|---|
+| 0 | `success` | Outputs extracted. Any recoveries are listed. |
+| 10 | `business_outcome` | The app answered with a known business state (e.g. MEMBER_NOT_FOUND). This is not an error. |
+| 20 | `failed` | A typed failure category. The table in `cua/replay/result.py` fixes each category's `retryable` flag. |
+| 30 | `escalated` | Handed to a human, who resolved it outside automation (e.g. "Mark handled"). |
+| 2 | - | Invalid invocation (bad flags, unknown artifact or tool, invalid catalog args). Nothing ran. |
+
+## Where things are
+
+| Brief | Code | Evidence |
+|---|---|---|
+| 3.1 Goal-driven agent loop | `cua/discovery/` (agent, tools, prompts, recorder), `cua/surface/` | `evidence/discovery/` |
+| 3.2 Structured artifact (agent-invocable capability) | `cua/artifact/`, `capabilities/`, `schemas/`, `cua/catalog.py` | `evidence/discovery/*/artifact_show.md`, `evidence/catalog/tools.json`, `evidence/replay/catalog_invoke_read_balance/` |
+| 3.3 Deterministic replay | `cua/replay/`, `cua/execute.py` | `evidence/replay/` (18 scenarios) |
+| 3.4 Safety & policy guardrails | `cua/policy/`, `configs/policy.yaml` | `evidence/replay/subaccount_*`, `evidence/replay/commit_uncertain_*` |
+| 3.5 Evidence / observability | `cua/obs/`, `scripts/make_evidence.py`, `scripts/scan_evidence.py` | `evidence/README.md` |
+| 3.6 Human-in-the-loop escalation & handoff | `cua/hitl/`, `cua/replay/engine.py` (resume rules) | `evidence/hitl/` |
+| 3.7 Design for heterogeneity & scale (design in [REPORT.md §4](REPORT.md#4-heterogeneity--multi-tenant)) | `cua/surface/base.py`, `cua/artifact/overrides.py`, `configs/app_profiles/tenants/` | `evidence/replay/drift_tenant_b_*` |
+
+## Security notes
+
+- **Synthetic data only.** The mock bank's members, SSNs, phones and emails are fake, and so are
+  the operator credentials. Nothing secret or PII is written to disk unredacted, and screenshots
+  are masked.
+- **Console and CDP are localhost only, with no authentication.** The operator console binds
+  127.0.0.1, and the `--hitl` CDP port gives full control of the browser. Production needs SSO,
+  authorization, an audit trail and an authenticated screencast.
+- **Traces are unmasked.** Playwright traces (`--trace`, `runs/<id>/trace.zip`) contain the raw
+  DOM. They are opt-in and must never be committed.
+
+## AI-assisted development
+
+This project was built with Claude Code; the design decisions, reviews and approvals are mine (see
+[REPORT.md](REPORT.md)).
