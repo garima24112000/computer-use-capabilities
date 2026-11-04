@@ -28,6 +28,19 @@ succeed if simply retried later; false means the caller or a human must change s
 | session_expired_after_commit | no    | session lost after an irreversible step; a human   |
 |                              |       | must check whether the commit happened first       |
 | internal                     | no    | a bug in the engine (evidence still captured)      |
+
+Recoveries (recorded in `recoveries`; the run still succeeded):
+- interstitial: a profile interstitial was detected and its recover actions ran.
+- dialog: a known JS dialog was answered per the profile.
+- session_relogin: the session expired before any irreversible step; re-login, restart.
+- settle_retry: the page did not settle within settle_timeout_ms and the step's retry policy
+  allowed waiting again (no re-click, ever). Only for steps WITHOUT an `expect`.
+- settle_absorbed_by_checkpoint (id "slow_settle"): the page did not settle in time, but the
+  step's `expect` checkpoint then held within its own timeout; the detail gives the ms waited.
+
+Settle timeouts are never swallowed silently: with an `expect` the checkpoint decides (absorbed
+→ recovery recorded; not holding → failed/settle_timeout); without one the retry policy decides
+(→ settle_retry recoveries, or failed/settle_timeout when attempts run out).
 """
 
 from datetime import datetime
@@ -108,7 +121,8 @@ class Failure(BaseModel):
 
 
 class Recovery(BaseModel):
-    kind: Literal["interstitial", "dialog", "session_relogin", "settle_retry"]
+    kind: Literal["interstitial", "dialog", "session_relogin", "settle_retry",
+                  "settle_absorbed_by_checkpoint"]
     id: str
     step_id: str | None = None
     detail: str = ""

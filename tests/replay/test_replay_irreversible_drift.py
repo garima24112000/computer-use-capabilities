@@ -26,10 +26,10 @@ def accounts_of(base_url: str, member: str) -> str:
 
 @pytest.mark.parametrize("kind", KINDS)
 def test_unapproved_irreversible_artifact_is_refused_before_any_browser(
-        app_a, replay, monkeypatch, kind):
+        app_a, replay, monkeypatch, draft_open, kind):
     monkeypatch.setattr(replay_session, "PlaywrightSurface",
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("browser")))
-    r = replay(app_a, OPEN, open_inputs("22222"), kind=kind)
+    r = replay(app_a, OPEN, open_inputs("22222"), root=draft_open(kind))
     assert r.status == "failed" and r.failure.category == "artifact_not_approved"
     assert "cua artifact approve" in r.failure.observed
     assert r.capability.approved is False

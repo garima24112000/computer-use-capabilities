@@ -6,6 +6,7 @@ Artifact sets:
 - "fixture": the hand-written fixtures in tests/fixtures/capabilities/ (a second, independent set).
 """
 
+import json
 import shutil
 from pathlib import Path
 from types import SimpleNamespace
@@ -80,6 +81,25 @@ def approved_open(tmp_path):
         assert out.exit_code == 0, out.output
         assert store.load(path)[0].is_approved()
         return SimpleNamespace(root=dst, path=path)
+
+    return make
+
+
+@pytest.fixture
+def draft_open(tmp_path):
+    """A copy of the latest meridian.subaccount.open forced back to an unapproved draft,
+    whatever its approval state in the real store."""
+
+    def make(kind: str) -> Path:
+        src = resolve_artifact(OPEN, artifact_root(kind, OPEN))
+        data = json.loads(src.read_text())
+        data["status"], data["review"] = "draft", {}
+        for step in data["steps"]:
+            step["approved"] = False
+        dst = tmp_path / f"draft-{kind}"
+        (dst / OPEN).mkdir(parents=True)
+        (dst / OPEN / src.name).write_text(json.dumps(data))
+        return dst
 
     return make
 

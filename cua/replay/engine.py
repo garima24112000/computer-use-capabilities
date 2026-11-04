@@ -377,14 +377,39 @@ class ReplayEngine:
                                                 settle=False))
         elif isinstance(a, Press):
             self._guard(step, lambda: gs.press(a.key, target, settle=False))
+        self._settle(step)
+
+    def _settle(self, step: Step) -> None:
+        """Wait for the page to settle. A settle timeout is never swallowed silently:
+        - with an `expect`: the checkpoint decides. If it holds within its own timeout the
+          step goes on and a settle_absorbed_by_checkpoint recovery records the ms waited;
+          otherwise failed/settle_timeout.
+        - without one: the retry policy decides (wait again, never re-click; never for
+          irreversible steps), then failed/settle_timeout.
+        """
         irreversible = step.risk == "irreversible"
         attempts = 1 if irreversible or "settle_timeout" not in step.retry.on \
             else step.retry.max_attempts
+        started = self.clock()
         for n in range(1, attempts + 1):
             try:
-                gs.wait_for_settle(step.settle_timeout_ms)
+                self.gs.wait_for_settle(step.settle_timeout_ms)
                 return
             except SettleTimeout as exc:
+                if step.expect is not None:
+                    res = check_checkpoint(self.gs, step.expect, self.inputs)
+                    waited = round((self.clock() - started) * 1000)
+                    if res.ok:
+                        self._recovery(
+                            "settle_absorbed_by_checkpoint", "slow_settle", step.id,
+                            f"no settle within {step.settle_timeout_ms} ms ({exc.reason}); "
+                            f"expect held after {waited} ms waited")
+                        return
+                    raise _Fail(FailureCategory.settle_timeout, step.id,
+                                f"page settled within {step.settle_timeout_ms} ms, or the "
+                                "step's expect held",
+                                f"{exc}; then expect failed after {waited} ms: "
+                                f"{res.failures()}") from None
                 if n == attempts:
                     raise _Fail(FailureCategory.settle_timeout, step.id,
                                 f"page settled within {step.settle_timeout_ms} ms",
